@@ -83,8 +83,14 @@ function addPiece(p, ann) {
   if (ann) broadcast({ t: 'pc+', p });
   return p;
 }
+function addCar(id, x, z) { world.cars.set(id, { id, x: +x.toFixed(1), y: +S.height(x, z).toFixed(2), z: +z.toFixed(1), yaw: +(Math.random() * 6.283).toFixed(2), hp: 400, drv: 0, v: rnd(2), hue: rnd(360), dirty: 0 }); }
+function releaseCar(c) { if (!c.car) return; const car = world && world.cars.get(c.car); if (car) { car.drv = 0; car.dirty = 3; } c.car = null; c.fl &= ~16; }
+function explodeCar(car, attacker) {
+  world.cars.delete(car.id); broadcast({ t: 'car-', id: car.id, x: car.x, y: car.y, z: car.z });
+  for (const e of ents()) { if (e.car === car.id) e.car = null; if (e.alive && Math.hypot(e.x - car.x, e.y - car.y, e.z - car.z) < 6.5) damage(e, e.id === car.drv ? 60 : 40, attacker, 'car'); }
+}
 function genWorld() {
-  world = { objs: new Map(), chests: new Map(), pieces: new Map(), loot: new Map() };
+  world = { objs: new Map(), chests: new Map(), pieces: new Map(), loot: new Map(), cars: new Map() };
   let oid = 1;
   const rects = [];
   for (const poi of S.POIS) {
@@ -103,12 +109,12 @@ function genWorld() {
       for (let s = 0; s < storeys; s++) {
         const iy = poi.l + s;
         for (let i = 0; i < w; i++) {
-          if (!(s === 0 && i === door)) addPiece({ t: 'w', ix: cx + i, iy, iz: cz, d: 0, mat });
-          addPiece({ t: 'w', ix: cx + i, iy, iz: cz + d, d: 0, mat });
+          if (!(s === 0 && i === door)) addPiece({ t: 'w', ix: cx + i, iy, iz: cz, d: 0, mat, v: Math.random() < 0.3 ? 1 : 0 });
+          addPiece({ t: 'w', ix: cx + i, iy, iz: cz + d, d: 0, mat, v: Math.random() < 0.4 ? 1 : 0 });
         }
         for (let j = 0; j < d; j++) {
-          addPiece({ t: 'w', ix: cx, iy, iz: cz + j, d: 1, mat });
-          addPiece({ t: 'w', ix: cx + w, iy, iz: cz + j, d: 1, mat });
+          addPiece({ t: 'w', ix: cx, iy, iz: cz + j, d: 1, mat, v: Math.random() < 0.4 ? 1 : 0 });
+          addPiece({ t: 'w', ix: cx + w, iy, iz: cz + j, d: 1, mat, v: Math.random() < 0.4 ? 1 : 0 });
         }
         const stairs = s < storeys - 1;
         for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) {
@@ -134,7 +140,7 @@ function genWorld() {
       const x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr;
       const cx = x / G, cz = z / G;
       if (placed.some((h) => cx > h.cx - 1 && cx < h.cx + h.w + 1 && cz > h.cz - 1 && cz < h.cz + h.d + 1)) continue;
-      world.objs.set(oid, { id: oid++, t: 'car', x: +x.toFixed(1), z: +z.toFixed(1), s: 1, r: rnd(2), hp: 240 }); i++;
+      addCar(oid++, x, z); i++;
     }
   }
   for (let i = 0; i < 420; i++) {
@@ -148,6 +154,10 @@ function genWorld() {
     const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
     if (S.height(x, z) < 0.3 || S.poiAt(x, z, 2)) continue;
     world.objs.set(oid, { id: oid++, t: 'rock', x: +x.toFixed(1), z: +z.toFixed(1), s: +(0.7 + Math.random() * 0.9).toFixed(2), hp: 150 });
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 210, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+    if (S.height(x, z) > 1.5 && !S.poiAt(x, z, 4)) addCar(oid++, x, z);
   }
   for (let i = 0; i < 26; i++) {
     const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 215;
@@ -165,7 +175,7 @@ function genWorld() {
     if (it.k === 'w') addLoot(ammoFor(it.w), x + 0.9, S.height(x + 0.9, z), z);
   }
 }
-const packWorld = () => ({ objs: [...world.objs.values()], chests: [...world.chests.values()], pieces: [...world.pieces.values()], loot: [...world.loot.values()] });
+const packWorld = () => ({ objs: [...world.objs.values()], chests: [...world.chests.values()], pieces: [...world.pieces.values()], loot: [...world.loot.values()], cars: [...world.cars.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v, hue: c.hue, drv: c.drv })) });
 
 // ---------- Sturm
 function chooseNext() {
@@ -208,6 +218,7 @@ function kill(target, attacker, wname) {
   target.alive = false; target.hp = 0;
   const place = alive().length + 1;
   if (attacker && attacker !== target) attacker.kills++;
+  releaseCar(target);
   broadcast({ t: 'kill', v: target.id, k: attacker && attacker !== target ? attacker.id : 0, w: wname, place, kills: attacker ? attacker.kills : 0 });
   if (target.bot && phase === 'game') {
     const items = [{ k: 'm', m: 'wood', n: 40 + rnd(60) }];
@@ -245,14 +256,14 @@ function startMatch() {
   chooseNext();
   bots = [];
   const hs = humans();
-  for (const c of hs) Object.assign(c, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, w: 'pick', lastShot: {}, lastHarvest: 0 });
+  for (const c of hs) Object.assign(c, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, w: 'pick', lastShot: {}, lastHarvest: 0, car: null, lastRam: 0 });
   const names = BN.slice().sort(() => Math.random() - 0.5);
   for (let i = hs.length; i < TOTAL; i++) bots.push(makeBot(names[i % names.length] + (10 + rnd(89))));
   broadcast({ t: 'start', world: packWorld(), ship, roster: roster() });
 }
 function toLobby() {
   phase = 'lobby'; lobbyT = LOBBY; bots = [];
-  for (const c of clients.values()) { c.inMatch = false; c.alive = false; }
+  for (const c of clients.values()) { c.inMatch = false; c.alive = false; c.car = null; }
   broadcast({ t: 'lobby' });
 }
 
@@ -378,8 +389,9 @@ setInterval(() => {
   }
   const p = [];
   for (const e of ents()) if (e.alive) p.push([e.id, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), +e.pitch.toFixed(2), Math.ceil(e.hp), Math.ceil(e.sh), e.fl, e.w]);
-  const sp = shipPos();
-  broadcast({ t: 's', ph: phase, p, al: p.length, gt: +gameT.toFixed(1),
+  const sp = shipPos(), cs = [];
+  for (const c of world.cars.values()) if (c.dirty > 0) { c.dirty--; cs.push([c.id, +c.x.toFixed(2), +c.y.toFixed(2), +c.z.toFixed(2), +c.yaw.toFixed(2), c.drv]); }
+  broadcast({ t: 's', ph: phase, p, cs, al: p.length, gt: +gameT.toFixed(1),
     st: [+storm.x.toFixed(1), +storm.z.toFixed(1), +storm.r.toFixed(1), +storm.nx.toFixed(1), +storm.nz.toFixed(1), +storm.nr.toFixed(1), Math.ceil(storm.timer), storm.shrink ? 1 : 0, storm.i, storm.done ? 1 : 0],
     ship: gameT < ship.dur * 1.15 ? [+sp.x.toFixed(1), +sp.z.toFixed(1)] : null });
 }, 66);
@@ -408,8 +420,9 @@ function onMsg(c, m) {
     case 'pos':
       if (!c.alive) return;
       c.x = num(m.x, c.x); c.y = num(m.y, c.y); c.z = num(m.z, c.z); c.yaw = num(m.yaw); c.pitch = num(m.pitch);
-      c.fl = (m.fl | 0) & 15; c.w = WCODES.has(m.w) ? m.w : 'pick';
+      c.fl = (m.fl | 0) & 239; c.w = WCODES.has(m.w) ? m.w : 'pick';
       if (gameT > ship.dur + 2) c.fl &= ~1;
+      if (c.car) { const car = world.cars.get(c.car); if (car) { c.fl |= 16; car.x = c.x; car.y = c.y; car.z = c.z; car.yaw = num(m.cy); car.dirty = 2; } else c.car = null; }
       break;
     case 'shot':
       if (!live || !S.W[m.w] || !Array.isArray(m.o) || !Array.isArray(m.e)) return;
@@ -444,6 +457,10 @@ function onMsg(c, m) {
         const p = world.pieces.get(String(m.key)); if (!p) return;
         send(c, { t: 'mat', m: p.mat, n: 5 });
         hitPiece(p.key, 50);
+      } else if (m.k === 'c') {
+        const car = world.cars.get(m.id | 0); if (!car || Math.hypot(car.x - c.x, car.z - c.z) > 8) return;
+        car.hp -= 34; send(c, { t: 'mat', m: 'metal', n: 15 });
+        if (car.hp <= 0) explodeCar(car, c);
       } else if (m.k === 'e') {
         const tg = ent(m.id | 0); if (tg && tg !== c && Math.hypot(tg.x - c.x, tg.y - c.y, tg.z - c.z) < 5) damage(tg, 20, c, 'pick');
       }
@@ -452,6 +469,7 @@ function onMsg(c, m) {
     case 'build': {
       const q = m.p; if (!live || !q || (c.fl & 7) || !S.MATS[q.mat]) return;
       const p = { t: q.t, ix: q.ix | 0, iy: q.iy | 0, iz: q.iz | 0, mat: q.mat };
+      if (c.car) return;
       if (p.t === 'w') p.d = q.d ? 1 : 0; else if (p.t === 'r') p.rot = (q.rot | 0) & 3; else if (p.t !== 'f') return;
       if (Math.hypot((p.ix + 0.5) * G - c.x, (p.iy + 0.5) * H - c.y, (p.iz + 0.5) * G - c.z) > 16 || world.pieces.size > 6000) return;
       addPiece(p, true);
@@ -482,14 +500,32 @@ function onMsg(c, m) {
       else if (m.c === 'pot') c.sh = Math.min(100, c.sh + 50); else if (m.c === 'mini') c.sh = Math.max(c.sh, Math.min(50, c.sh + 25));
       break;
     }
+    case 'enter': {
+      const car = world.cars.get(m.id | 0); if (!live || !car || car.drv || c.car || (c.fl & 7) || Math.hypot(car.x - c.x, car.z - c.z) > 8) return;
+      car.drv = c.id; c.car = car.id; car.dirty = 3; send(c, { t: 'car', id: car.id });
+      break;
+    }
+    case 'exit': releaseCar(c); break;
+    case 'hitcar': {
+      const W = S.W[m.w], car = world.cars.get(m.id | 0); if (!live || !W || !car) return;
+      car.hp -= S.wdmg(m.w, m.r | 0, 0, false) * Math.min(W.pellets, Math.max(1, m.n | 0));
+      if (car.hp <= 0) explodeCar(car, c);
+      break;
+    }
+    case 'ram': {
+      const tg = ent(m.id | 0), now = Date.now(); if (!live || !c.car || !tg || tg === c || now - c.lastRam < 500) return;
+      if (Math.hypot(tg.x - c.x, tg.y - c.y, tg.z - c.z) < 7) { c.lastRam = now; damage(tg, 35, c, 'car'); }
+      break;
+    }
+    case 'rampc': { const now = Date.now(); if (live && c.car && now - c.lastRam > 150) { c.lastRam = now; hitPiece(String(m.k), 170); } break; }
     case 'fall': if (live) damage(c, Math.min(300, Math.max(0, num(m.d))), null, 'fall'); break;
   }
 }
 wss.on('connection', (ws) => {
-  const c = { ws, id: nextId++, joined: false, inMatch: false, alive: false, name: '', hue: rnd(360), x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fl: 0, w: 'pick', hp: 100, sh: 0, kills: 0, lastShot: {}, lastHarvest: 0 };
+  const c = { ws, id: nextId++, joined: false, inMatch: false, alive: false, name: '', hue: rnd(360), x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fl: 0, w: 'pick', hp: 100, sh: 0, kills: 0, lastShot: {}, lastHarvest: 0, car: null, lastRam: 0 };
   clients.set(c.id, c);
   ws.on('message', (d) => { let m; try { m = JSON.parse(d); } catch (e) { return; } if (m && typeof m === 'object') { try { c.dropped = c.alive ? false : c.dropped; onMsg(c, m); } catch (e) { console.error(e); } } });
-  ws.on('close', () => { if (c.inMatch && c.alive && phase === 'game') kill(c, null, 'quit'); clients.delete(c.id); });
+  ws.on('close', () => { if (c.inMatch && c.alive && phase === 'game') kill(c, null, 'quit'); releaseCar(c); clients.delete(c.id); });
   ws.on('error', () => {});
 });
 server.listen(PORT, () => console.log('Sturmfall läuft auf Port ' + PORT));
