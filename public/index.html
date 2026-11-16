@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Sturmfall – Battle Royale</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+html,body{height:100%;overflow:hidden;background:#0b1020;font-family:"Arial Black","Segoe UI",Arial,sans-serif;color:#fff}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;z-index:20}
+.ov.on{display:flex}
+#menu{background:linear-gradient(160deg,rgba(20,40,110,.82),rgba(90,30,140,.82))}
+h1{font-size:76px;font-style:italic;letter-spacing:2px;text-shadow:0 5px 0 #1b2a66,0 10px 24px rgba(0,0,0,.5);transform:skewX(-6deg)}
+h1 span{color:#ffd83a}
+.sub{font-family:"Segoe UI",Arial,sans-serif;font-weight:600;opacity:.9;margin:6px 0 22px}
+#name{font:700 20px "Segoe UI",Arial;padding:12px 16px;border-radius:8px;border:3px solid #fff;background:rgba(0,0,0,.35);color:#fff;text-align:center;width:280px;outline:none;user-select:text}
+.btn{margin-top:14px;font:900 26px "Arial Black",Arial;font-style:italic;padding:12px 54px;border:none;border-radius:8px;background:#ffd83a;color:#1a1a1a;cursor:pointer;box-shadow:0 5px 0 #b38f00;text-transform:uppercase}
+.btn:hover{filter:brightness(1.08)}.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #b38f00}
+.keys{margin-top:26px;font:600 13px/1.75 "Segoe UI",Arial;background:rgba(0,0,0,.35);padding:14px 22px;border-radius:10px;display:grid;grid-template-columns:auto auto;gap:0 26px;text-align:left}
+.keys b{color:#ffd83a}
+#lobby{background:rgba(10,16,40,.55)}
+#lobby .big{font-size:44px;font-style:italic}
+#lobbyT{font-size:92px;color:#ffd83a;text-shadow:0 4px 0 rgba(0,0,0,.4)}
+#lobbyN{font:600 16px "Segoe UI",Arial;max-width:600px;opacity:.9;margin-top:8px}
+#dead,#win{background:rgba(0,0,0,.35);pointer-events:none;justify-content:flex-start;padding-top:12vh}
+#dead .big,#win .big{font-size:60px;font-style:italic;text-shadow:0 4px 0 rgba(0,0,0,.5)}
+#win .big{color:#ffd83a;font-size:84px}
+.small{font:600 18px "Segoe UI",Arial;margin-top:8px;text-shadow:0 2px 4px #000}
+#hud{position:fixed;inset:0;pointer-events:none;display:none;z-index:10;font-family:"Segoe UI",Arial,sans-serif}
+#hud.on{display:block}
+#mini{position:absolute;top:14px;right:14px;width:190px;height:190px;border:3px solid rgba(255,255,255,.85);border-radius:6px;background:#123}
+#info{position:absolute;top:212px;right:14px;width:190px;font-weight:800;font-size:15px;text-align:right;text-shadow:0 2px 3px #000;line-height:1.5}
+#info .st{color:#d7b3ff}
+#bars{position:absolute;left:22px;bottom:22px;width:330px}
+.bar{height:20px;background:rgba(0,0,0,.5);border-radius:4px;margin-top:6px;position:relative;overflow:hidden;border:2px solid rgba(0,0,0,.55)}
+.bar i{position:absolute;left:0;top:0;bottom:0;transition:width .15s}
+.bar span{position:absolute;right:7px;top:-1px;font-weight:900;font-size:14px;text-shadow:0 1px 2px #000}
+#shb i{background:#33a8ff}#hpb i{background:#47d64a}
+#inv{position:absolute;right:16px;bottom:18px;display:flex;gap:6px}
+.slot{width:74px;height:74px;border-radius:6px;background:rgba(0,0,0,.45);border:3px solid rgba(255,255,255,.25);position:relative;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;text-align:center;text-shadow:0 1px 2px #000}
+.slot.sel{border-color:#fff;transform:translateY(-7px)}
+.slot .k{position:absolute;left:4px;top:2px;font-size:11px;opacity:.85}
+.slot .a{position:absolute;right:5px;bottom:2px;font-size:13px}
+#build{position:absolute;right:16px;bottom:104px;display:flex;gap:6px;align-items:center;font-weight:800;font-size:13px}
+.bs{padding:5px 9px;border-radius:5px;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.25)}
+.bs.sel{border-color:#59b7ff;background:rgba(40,120,220,.6)}
+.mat{padding:5px 8px;border-radius:5px;background:rgba(0,0,0,.45);border:2px solid transparent}
+.mat.sel{border-color:#ffd83a}
+#ammo{position:absolute;right:20px;bottom:142px;font-weight:900;font-size:26px;text-shadow:0 2px 4px #000}
+#ammo small{font-size:15px;opacity:.85}
+#cross{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross:before{left:12px;top:0;width:2px;height:26px;clip-path:polygon(0 0,100% 0,100% 35%,0 35%,0 65%,100% 65%,100% 100%,0 100%)}
+#cross:after{top:12px;left:0;height:2px;width:26px;clip-path:polygon(0 0,35% 0,35% 100%,0 100%,0 0,65% 0,100% 0,100% 100%,65% 100%,65% 0)}
+#hitm{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;opacity:0;transform:rotate(45deg)}
+#hitm:before,#hitm:after{content:"";position:absolute;background:#fff}
+#hitm:before{left:14px;top:0;width:2px;height:30px;clip-path:polygon(0 0,100% 0,100% 30%,0 30%,0 70%,100% 70%,100% 100%,0 100%)}
+#hitm:after{top:14px;left:0;height:2px;width:30px;clip-path:polygon(0 0,30% 0,30% 100%,0 100%,0 0,70% 0,100% 0,100% 100%,70% 100%,70% 0)}
+#prompt{position:absolute;left:50%;top:60%;transform:translateX(-50%);font-weight:800;font-size:17px;background:rgba(0,0,0,.55);padding:7px 14px;border-radius:6px;display:none;white-space:nowrap}
+#prompt b{background:#fff;color:#000;border-radius:4px;padding:0 7px;margin-right:6px}
+#use{position:absolute;left:50%;top:68%;width:240px;margin-left:-120px;height:14px;background:rgba(0,0,0,.55);border-radius:7px;overflow:hidden;display:none}
+#use i{display:block;height:100%;background:#ffd83a;width:0}
+#banner{position:absolute;left:50%;top:17%;transform:translateX(-50%);font:900 30px "Arial Black",Arial;font-style:italic;text-shadow:0 3px 0 rgba(0,0,0,.55);opacity:0;transition:opacity .3s;white-space:nowrap}
+#feed{position:absolute;left:18px;top:16px;font-weight:700;font-size:14px;text-shadow:0 1px 3px #000;line-height:1.6}
+#feed div{background:rgba(0,0,0,.35);padding:1px 9px;border-radius:4px;margin-bottom:3px;width:fit-content}
+#gain{position:absolute;left:50%;top:56%;transform:translateX(-50%);font-weight:900;font-size:18px;text-shadow:0 2px 3px #000;opacity:0;transition:opacity .25s}
+#tint{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,rgba(130,60,220,.12),rgba(110,30,200,.5));opacity:0;transition:opacity .4s}
+#hurt{position:fixed;inset:0;pointer-events:none;z-index:6;box-shadow:inset 0 0 140px 40px rgba(255,0,0,.75);opacity:0}
+#scope{position:fixed;inset:0;pointer-events:none;z-index:7;display:none;background:radial-gradient(circle at center,transparent 0,transparent 31vh,#000 31.4vh)}
+#scope:before,#scope:after{content:"";position:absolute;background:#000}
+#scope:before{left:50%;top:0;bottom:0;width:1px}#scope:after{top:50%;left:0;right:0;height:1px}
+#bigmap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;border:4px solid #fff;border-radius:8px;display:none;max-height:86vh;max-width:86vh;width:86vh}
+#lock{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:12;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:8px;font:800 17px "Segoe UI",Arial;display:none}
+.dn{position:fixed;z-index:11;font:900 22px "Arial Black",Arial;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;transition:transform .7s ease-out,opacity .7s}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tint"></div><div id="hurt"></div><div id="scope"></div>
+<div id="hud">
+  <div id="feed"></div>
+  <canvas id="mini" width="190" height="190"></canvas>
+  <div id="info"></div>
+  <div id="banner"></div>
+  <div id="cross"></div><div id="hitm"></div>
+  <div id="prompt"></div><div id="use"><i></i></div><div id="gain"></div>
+  <div id="bars"><div class="bar" id="shb"><i></i><span></span></div><div class="bar" id="hpb"><i></i><span></span></div></div>
+  <div id="ammo"></div>
+  <div id="build"></div>
+  <div id="inv"></div>
+</div>
+<canvas id="bigmap" width="700" height="700"></canvas>
+<div id="lock">Klicken, um zu steuern</div>
+<div class="ov on" id="menu">
+  <h1>STURM<span>FALL</span></h1>
+  <div class="sub">Battle Royale im Browser · Bauen · Looten · Überleben</div>
+  <input id="name" maxlength="14" placeholder="Dein Name" autocomplete="off">
+  <button class="btn" id="play">Spielen</button>
+  <div class="keys">
+    <div><b>WASD</b> Laufen · <b>Shift</b> Sprinten</div><div><b>Leertaste</b> Springen / Abspringen</div>
+    <div><b>Strg</b> Ducken</div><div><b>Linksklick</b> Schießen / Abbauen / Bauen</div>
+    <div><b>Rechtsklick</b> Zielen / Material wechseln</div><div><b>1–6</b> oder <b>Mausrad</b> Inventar</div>
+    <div><b>Q</b> Wand · <b>F</b> Boden · <b>C</b> Rampe</div><div><b>E</b> Aufheben / Truhe öffnen</div>
+    <div><b>R</b> Nachladen</div><div><b>M</b> Karte</div>
+  </div>
+</div>
+<div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyN"></div></div>
+<div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div></div>
+<div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div></div>
+<script src="shared.js"></script>
+<script type="module" src="game.js"></script>
+</body>
+</html>
