@@ -2,12 +2,14 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:,">
 <title>Sturmfall – Battle Royale</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;user-select:none}
-html,body{height:100%;overflow:hidden;background:#0b1020;font-family:"Arial Black","Segoe UI",Arial,sans-serif;color:#fff}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;position:fixed;inset:0;touch-action:none;overscroll-behavior:none;background:#0b1020;font-family:"Arial Black","Segoe UI",Arial,sans-serif;color:#fff}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 .ov{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;z-index:20}
 .ov.on{display:flex}
@@ -72,8 +74,47 @@ h1 span{color:#ffd83a}
 #scope:before,#scope:after{content:"";position:absolute;background:#000}
 #scope:before{left:50%;top:0;bottom:0;width:1px}#scope:after{top:50%;left:0;right:0;height:1px}
 #bigmap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;border:4px solid #fff;border-radius:8px;display:none;max-height:86vh;max-width:86vh;width:86vh}
-#lock{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:12;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:8px;font:800 17px "Segoe UI",Arial;display:none}
+#lock{pointer-events:none;position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:12;background:rgba(0,0,0,.7);padding:10px 20px;border-radius:8px;font:800 17px "Segoe UI",Arial;display:none}
 .dn{position:fixed;z-index:11;font:900 22px "Arial Black",Arial;pointer-events:none;text-shadow:0 2px 0 #000,0 0 4px #000;transition:transform .7s ease-out,opacity .7s}
+
+#touch{position:fixed;inset:0;z-index:9;display:none;touch-action:none}
+body.touch #touch{display:block}
+.tb{position:absolute;display:none;align-items:center;justify-content:center;border-radius:50%;background:rgba(0,0,0,.38);border:3px solid rgba(255,255,255,.7);font:900 12px "Segoe UI",Arial;color:#fff;text-shadow:0 1px 2px #000;touch-action:none}
+body.touch.ingame .tb{display:flex}
+.tb.on{background:rgba(255,255,255,.4)}.tb.act{background:rgba(255,216,58,.55);border-color:#ffd83a}
+#bFire{right:calc(26px + env(safe-area-inset-right));bottom:74px;width:86px;height:86px;font-size:14px;background:rgba(220,50,40,.45)}
+#bFire2{left:calc(18px + env(safe-area-inset-left));top:27%;width:60px;height:60px;background:rgba(220,50,40,.35)}
+#bJump{right:calc(126px + env(safe-area-inset-right));bottom:62px;width:66px;height:66px}
+#bAds{right:calc(30px + env(safe-area-inset-right));bottom:176px;width:58px;height:58px}
+#bRel{right:calc(104px + env(safe-area-inset-right));bottom:148px;width:52px;height:52px}
+#bCrouch{right:calc(196px + env(safe-area-inset-right));bottom:70px;width:52px;height:52px}
+#stick{position:absolute;display:none;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.5);pointer-events:none}
+#knob{position:absolute;left:36px;top:36px;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.6)}
+#rotate{background:#141a3a;z-index:40;font:800 22px "Segoe UI",Arial;padding:30px}
+@media (orientation:portrait){body.touch #rotate{display:flex}}
+.thint{display:none}
+body.touch .keys{display:none}body.touch .thint{display:block;font:600 13px/1.6 "Segoe UI",Arial;margin-top:14px;opacity:.9;max-width:520px}
+body.touch h1{font-size:46px}body.touch .sub{margin:2px 0 10px;font-size:13px}
+body.touch #name{padding:8px 12px;font-size:17px}body.touch .btn{font-size:20px;padding:9px 40px;margin-top:10px}
+body.touch #lobby .big{font-size:26px}body.touch #lobbyT{font-size:60px}
+body.touch #dead .big{font-size:36px}body.touch #win .big{font-size:44px}body.touch .small{font-size:14px}
+body.touch #dead,body.touch #win{padding-top:16vh}
+body.touch #mini{width:118px;height:118px;top:8px;right:calc(8px + env(safe-area-inset-right));pointer-events:auto}
+body.touch #info{top:130px;right:calc(8px + env(safe-area-inset-right));width:150px;font-size:12px}
+body.touch #feed{font-size:11px;top:6px;left:calc(84px + env(safe-area-inset-left));line-height:1.4}
+body.touch #bars{left:50%;bottom:auto;top:6px;width:210px;margin-left:-105px}
+body.touch .bar{height:13px;margin-top:3px}body.touch .bar span{font-size:10px;top:-2px}
+body.touch #banner{font-size:18px;top:22%}
+body.touch #inv{right:auto;left:50%;transform:translateX(-50%);bottom:5px;gap:4px;pointer-events:auto}
+body.touch .slot{width:48px;height:48px;font-size:8.5px;border-width:2px}body.touch .slot.sel{transform:translateY(-4px)}
+body.touch .slot .k{display:none}body.touch .slot .a{font-size:10px;right:3px;bottom:0}
+body.touch #build{right:auto;left:50%;transform:translateX(-50%);bottom:60px;gap:4px;font-size:11px;pointer-events:auto;white-space:nowrap}
+body.touch .bs{padding:7px 10px}body.touch .mat{padding:7px 7px}
+body.touch #ammo{right:calc(128px + env(safe-area-inset-right));bottom:136px;font-size:17px}body.touch #ammo small{font-size:11px}
+body.touch #prompt{top:auto;bottom:112px;font-size:14px;padding:10px 14px;pointer-events:auto;border:2px solid #ffd83a}
+body.touch #use{top:62%}body.touch #gain{font-size:14px}
+body.touch #lock{display:none!important}
+body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
 </style>
 </head>
 <body>
@@ -91,6 +132,15 @@ h1 span{color:#ffd83a}
   <div id="build"></div>
   <div id="inv"></div>
 </div>
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div class="tb" id="bFire2">FEUER</div>
+  <div class="tb" id="bFire">FEUER</div>
+  <div class="tb" id="bJump">SPRUNG</div>
+  <div class="tb" id="bAds">ZIELEN</div>
+  <div class="tb" id="bRel">LADEN</div>
+  <div class="tb" id="bCrouch">DUCKEN</div>
+</div>
 <canvas id="bigmap" width="700" height="700"></canvas>
 <div id="lock">Klicken, um zu steuern</div>
 <div class="ov on" id="menu">
@@ -105,7 +155,9 @@ h1 span{color:#ffd83a}
     <div><b>Q</b> Wand · <b>F</b> Boden · <b>C</b> Rampe</div><div><b>E</b> Aufheben / Truhe öffnen</div>
     <div><b>R</b> Nachladen</div><div><b>M</b> Karte</div>
   </div>
+  <div class="thint">Links wischen: Laufen (ganz nach außen = Sprinten) · Rechts wischen: Umsehen · FEUER: Schießen, Abbauen, Bauen · Automatisches Feuern, wenn das Fadenkreuz auf einem Gegner liegt · Inventar, Bauteile und Karte antippen</div>
 </div>
+<div class="ov" id="rotate">📱↻<br>Bitte das Gerät quer drehen</div>
 <div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyN"></div></div>
 <div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div></div>
 <div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div></div>
