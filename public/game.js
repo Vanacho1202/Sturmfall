@@ -1,5 +1,5 @@
 import * as THREE from './lib/three.module.js';
-import { VM, weaponGeo, weaponModel, MUZZLE, RARMAT, BPGEO, itemGeo, chestModel, makeChar as buildChar, disposeChar, carModel, CARSEAT, natureGeos, houseDeco, streakGeo, makeSky, makeClouds, Particles, pieceMaterials, stormTexture } from './models.js';
+import { VM, pickaxeGeo, weaponGeo, weaponModel, MUZZLE, RARMAT, BPGEO, itemGeo, chestModel, makeChar as buildChar, disposeChar, carModel, CARSEAT, natureGeos, houseDeco, streakGeo, makeSky, makeClouds, Particles, pieceMaterials, stormTexture } from './models.js';
 const S = window.S, G = S.G, H = S.H, HP = Math.PI / 2;
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -76,6 +76,33 @@ const pieceMat = pieceMaterials();
 const MATCOL = { wood: '#b9824a', stone: '#9c9c9c', metal: '#6d8296' };
 const RL = Math.hypot(G, H);
 const pieceGeo = { w: new THREE.BoxGeometry(G, H, 0.24), f: new THREE.BoxGeometry(G, 0.24, G), r: new THREE.BoxGeometry(G, 0.2, RL) };
+// ---- Inventar-Symbole: die echten 3D-Modelle einmal in kleine Bilder rendern
+const IC = {};
+function renderIcons() {
+  const cvs = document.createElement('canvas'); let r;
+  try { r = new THREE.WebGLRenderer({ canvas: cvs, alpha: true, antialias: true, preserveDrawingBuffer: true }); } catch (e) { return; }
+  r.setClearColor(0x000000, 0);
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x7f8fa8, 1.9));
+  const dl = new THREE.DirectionalLight(0xffffff, 2.6); dl.position.set(-2, 3, 1.5); sc.add(dl);
+  const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 40), bx = new THREE.Box3(), ctr = new THREE.Vector3(), v = new THREE.Vector3();
+  const shot = (obj, w, h, d) => {
+    r.setSize(w, h, false); sc.add(obj); obj.updateMatrixWorld(true); bx.setFromObject(obj); bx.getCenter(ctr);
+    cam.position.copy(ctr).addScaledVector(d, 12); cam.lookAt(ctr); cam.updateMatrixWorld(true);
+    let mx = 0, my = 0;
+    for (let i = 0; i < 8; i++) { v.set(i & 1 ? bx.max.x : bx.min.x, i & 2 ? bx.max.y : bx.min.y, i & 4 ? bx.max.z : bx.min.z).applyMatrix4(cam.matrixWorldInverse); mx = Math.max(mx, Math.abs(v.x)); my = Math.max(my, Math.abs(v.y)); }
+    const hw = Math.max(mx, my * w / h) * 1.05; cam.left = -hw; cam.right = hw; cam.top = hw * h / w; cam.bottom = -hw * h / w; cam.updateProjectionMatrix();
+    r.render(sc, cam); const url = cvs.toDataURL(); sc.remove(obj); return url;
+  };
+  const side = new THREE.Vector3(-1, 0.2, 0.3).normalize(), iso = new THREE.Vector3(-0.8, 0.65, 1).normalize();
+  for (const w in S.W) for (let q = 0; q < 5; q++) IC[w + q] = shot(weaponModel(w, q), 288, 144, side);
+  IC.pick = shot(new THREE.Mesh(pickaxeGeo(), VM), 288, 144, new THREE.Vector3(-1, 0.25, -0.2).normalize());
+  for (const c in S.CONS) IC[c] = shot(new THREE.Mesh(itemGeo({ k: 'c', c }), VM), 144, 144, iso);
+  for (const m in S.MATS) IC[m] = shot(new THREE.Mesh(itemGeo({ k: 'm', m }), VM), 96, 96, iso);
+  for (const k of ['w', 'f', 'r']) { const m = new THREE.Mesh(pieceGeo[k], pieceMat.wood[0]); if (k === 'r') m.rotation.x = -Math.atan2(H, G); IC['b' + k] = shot(m, 128, 96, k === 'r' ? new THREE.Vector3(-0.9, 0.6, -1).normalize() : iso); }
+  r.dispose(); if (r.forceContextLoss) r.forceContextLoss();
+}
+try { renderIcons(); } catch (e) { console.warn(e); }
+const pic = (k, alt) => (IC[k] ? '<img draggable="false" src="' + IC[k] + '">' : alt || '');
 function placePiece(m, p) {
   m.rotation.set(0, 0, 0);
   if (p.t === 'w') { if (p.d === 0) m.position.set((p.ix + 0.5) * G, (p.iy + 0.5) * H, p.iz * G); else { m.position.set(p.ix * G, (p.iy + 0.5) * H, (p.iz + 0.5) * G); m.rotation.y = Math.PI / 2; } }
@@ -478,18 +505,18 @@ function renderBars() {
 }
 function renderHud() {
   hudDirty = false; renderBars();
-  let h = '<div data-slot="0" class="slot' + (me.slot === 0 && !me.build ? ' sel' : '') + '"><span class="k">1</span>' + ICON.pick + '<span class="n">HACKE</span></div>';
+  let h = '<div data-slot="0" class="slot pk' + (me.slot === 0 && !me.build ? ' sel' : '') + '"><span class="k">1</span>' + pic('pick', ICON.pick) + '</div>';
   me.inv.forEach((it, i) => {
     const sel = me.slot === i + 1 && !me.build ? ' sel' : '', ds = '<div data-slot="' + (i + 1) + '" class="slot', k = '<span class="k">' + (i + 2) + '</span>';
     if (!it) h += ds + sel + '">' + k + '</div>';
-    else if (it.k === 'w') { const c = S.RAR[it.r].c; h += ds + sel + '" style="background:linear-gradient(160deg,' + c + 'ee,' + c + '55);border-color:' + (sel ? '#fff' : c) + '">' + k + ICON[it.w] + '<span class="n">' + S.W[it.w].s + '</span><span class="a">' + it.mag + '</span></div>'; }
-    else h += ds + sel + '">' + k + ICON[it.c].replace('<svg', '<svg style="fill:' + S.CONS[it.c].col + '"') + '<span class="n">' + S.CONS[it.c].s + '</span><span class="a">' + it.n + '</span></div>';
+    else if (it.k === 'w') h += ds + ' r' + it.r + sel + '">' + k + pic(it.w + it.r, ICON[it.w]) + '<span class="a">' + it.mag + '</span><i class="rl"></i></div>';
+    else h += ds + ' cs' + sel + '" style="--c:' + S.CONS[it.c].col + '">' + k + pic(it.c, ICON[it.c]) + '<span class="a">' + it.n + '</span></div>';
   });
   $('inv').innerHTML = h;
   const bn = { w: 'Q', f: 'F', r: 'C' };
   let b = '';
-  for (const k in bn) b += '<div data-b="' + k + '" class="bs' + (me.build === k ? ' sel' : '') + '">' + ICON[k] + (TOUCH ? '' : '<span>' + bn[k] + '</span>') + '</div>';
-  for (const m in S.MATS) b += '<div data-m="' + m + '" class="mat' + (me.bmat === m && me.build ? ' sel' : '') + '"><i style="background:' + MATCOL[m] + '"></i>' + me.mats[m] + '</div>';
+  for (const k in bn) b += '<div data-b="' + k + '" class="bs' + (me.build === k ? ' sel' : '') + '">' + pic('b' + k, ICON[k]) + (TOUCH ? '' : '<span>' + bn[k] + '</span>') + '</div>';
+  for (const m in S.MATS) b += '<div data-m="' + m + '" class="mat' + (me.bmat === m && me.build ? ' sel' : '') + '">' + pic(m, '<i style="background:' + MATCOL[m] + '"></i>') + me.mats[m] + '</div>';
   $('build').innerHTML = b;
   const it = me.slot > 0 ? me.inv[me.slot - 1] : null;
   let low = '';
@@ -653,7 +680,7 @@ function onMsg(m) {
     case 'roster': setRoster(m.r); break;
     case 'kill': {
       const v = esc(nameOf(m.v)), k = m.k ? esc(nameOf(m.k)) : '';
-      const ic = ICON[S.W[m.w] ? m.w : m.w === 'pick' ? 'pick' : m.w === 'car' ? 'car' : m.w === 'gren' ? 'gren' : 'storm'] || '';
+      const ic = S.W[m.w] ? pic(m.w + '0', ICON[m.w]) : m.w === 'pick' ? pic('pick', ICON.pick) : m.w === 'gren' ? pic('gren', ICON.gren) : ICON[m.w === 'car' ? 'car' : 'storm'];
       const ve = m.v === myId ? me : ents.get(m.v), ke = m.k === myId ? me : ents.get(m.k);
       const dist = ve && ke && m.k ? ' <span style="opacity:.6">' + Math.round(Math.hypot(ve.x - ke.x, ve.z - ke.z)) + ' m</span>' : '';
       feed(m.w === 'storm' ? ic + '<b>' + v + '</b> wurde vom Sturm erwischt' : m.w === 'fall' ? '<b>' + v + '</b> ist zu tief gefallen' : m.w === 'quit' ? '<b>' + v + '</b> hat das Spiel verlassen' : !m.k ? '<b>' + v + '</b> wurde eliminiert' : '<b>' + k + '</b>' + ic + '<b>' + v + '</b>' + dist, m.k === myId || m.v === myId);
@@ -1062,6 +1089,7 @@ function actions(dt, now) {
   }
   const u = $('use'), prog = me.using || me.reload;
   if (prog) { u.style.display = 'block'; u.firstChild.style.width = (1 - prog.t / prog.total) * 100 + '%'; } else u.style.display = 'none';
+  if (me.reload) { const el = document.querySelector('#inv .sel .rl'); if (el) el.style.height = (me.reload.t / me.reload.total) * 100 + '%'; }
   const gren = !me.build && it && it.c === 'gren' && me.st === 'ground' && !myCar;
   if (gren) updateArc(); else arcLine.visible = false;
   if (me.st !== 'ground' || myCar) return;

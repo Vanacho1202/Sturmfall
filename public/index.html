@@ -81,21 +81,31 @@ details{margin-top:12px;font-size:13px;font-weight:700}summary{cursor:pointer;op
 #bars.low #hpb .tr{animation:blink .8s infinite}
 .bar b{width:42px;font-size:20px;font-weight:900;text-shadow:0 2px 3px #000}
 #shb i{background:linear-gradient(180deg,#6fd0ff,#1f8fe6)}#hpb i{background:linear-gradient(180deg,#7df07a,#2fb53a)}
-#inv{position:absolute;right:16px;bottom:18px;display:flex;gap:7px}
-.slot{width:80px;height:80px;border-radius:10px;background:linear-gradient(160deg,rgba(60,70,90,.75),rgba(20,25,38,.75));border:2px solid rgba(255,255,255,.22);position:relative;display:flex;align-items:center;justify-content:center;transition:transform .1s;box-shadow:0 6px 14px rgba(0,0,0,.35)}
-.slot.sel{border-color:#fff;transform:translateY(-9px) scale(1.06);box-shadow:0 0 18px rgba(255,255,255,.55),0 8px 16px rgba(0,0,0,.4)}
-.slot svg{width:64px;height:28px;fill:#fff;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}
-.slot .k{position:absolute;left:5px;top:3px;font-size:11px;font-weight:800;background:rgba(0,0,0,.45);border-radius:4px;padding:0 5px}
-.slot .a{position:absolute;right:6px;bottom:3px;font-size:14px;font-weight:900;text-shadow:0 1px 2px #000}
-.slot .n{position:absolute;left:6px;bottom:4px;font-size:9px;font-weight:800;letter-spacing:.5px;opacity:.95;text-shadow:0 1px 2px #000}
-#build{position:absolute;right:16px;bottom:112px;display:flex;gap:6px;align-items:center;font-weight:800;font-size:12px}
+#inv{position:absolute;right:20px;bottom:16px;display:flex;gap:5px;align-items:flex-end}
+.slot{--c:#5a6478;width:96px;height:70px;border-radius:7px;position:relative;overflow:hidden;transform:skewX(-7deg);border:2px solid rgba(255,255,255,.16);background:linear-gradient(180deg,rgba(40,48,66,.5),rgba(10,14,24,.82));box-shadow:0 6px 14px rgba(0,0,0,.4);transition:width .1s,height .1s}
+.slot:after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--c);opacity:.9}
+.slot>*{transform:skewX(7deg)}
+.slot img{position:absolute;left:3%;top:6%;width:94%;height:78%;object-fit:contain;filter:drop-shadow(0 4px 3px rgba(0,0,0,.6));pointer-events:none}
+.slot.r0{--c:#9aa0a6}.slot.r1{--c:#3ecf4a}.slot.r2{--c:#3aa0ff}.slot.r3{--c:#b04dff}.slot.r4{--c:#ffb52e}
+.slot.r0,.slot.r1,.slot.r2,.slot.r3,.slot.r4,.slot.cs{border-color:var(--c);background:radial-gradient(ellipse at 50% 115%,var(--c) 0,rgba(0,0,0,0) 72%),linear-gradient(180deg,rgba(26,32,48,.75),rgba(10,14,24,.9))}
+.slot.cs img{left:14%;width:72%}.slot.pk img{left:5%;width:90%;top:2%;height:90%}
+.slot.pk{width:78px;margin-right:10px;--c:#cfd6dd}
+.slot.sel{width:112px;height:86px;border-color:#fff;box-shadow:0 0 0 1px #fff inset,0 0 24px rgba(255,255,255,.45),0 8px 16px rgba(0,0,0,.45)}
+.slot.pk.sel{width:92px}
+.slot svg{position:absolute;left:14%;top:26%;width:72%;height:44%;fill:#fff}
+.slot .k{position:absolute;left:7px;top:3px;font-size:11px;font-weight:800;opacity:.85;text-shadow:0 1px 2px #000}
+.slot .a{position:absolute;right:9px;bottom:6px;font-size:17px;font-weight:900;font-style:italic;text-shadow:0 2px 3px #000,0 0 6px #000}
+.slot .rl{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(0,0,0,.6);transform:none;pointer-events:none}
+#build{position:absolute;right:20px;bottom:112px;display:flex;gap:6px;align-items:center;font-weight:800;font-size:12px}
 .bs{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;background:var(--glass);border:2px solid rgba(255,255,255,.18)}
 .bs svg{width:26px;height:14px;fill:#bfe2ff}
+.bs img{height:26px;margin:-4px 0;filter:drop-shadow(0 2px 2px rgba(0,0,0,.6))}.mat img{height:22px;margin:-3px 0}
+#feed img{height:15px;vertical-align:-3px;margin:0 5px}
 .bs.sel{border-color:#59b7ff;background:rgba(40,120,220,.65);box-shadow:0 0 12px rgba(80,170,255,.6)}
 .mat{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:8px;background:var(--glass);border:2px solid transparent;font-size:14px}
 .mat i{width:13px;height:13px;border-radius:3px;border:1px solid rgba(0,0,0,.4)}
 .mat.sel{border-color:var(--y)}
-#ammo{position:absolute;right:22px;bottom:152px;font-weight:900;font-size:34px;font-style:italic;text-shadow:0 3px 5px #000}
+#ammo{position:absolute;right:26px;bottom:154px;font-weight:900;font-size:34px;font-style:italic;text-shadow:0 3px 5px #000}
 #ammo small{font-size:17px;opacity:.85}
 #cross{position:absolute;left:50%;top:50%}
 #cross i{position:absolute;background:#fff;box-shadow:0 0 2px #000}
@@ -163,10 +173,10 @@ body.touch #bars{left:50%;bottom:auto;top:4px;width:230px;margin-left:-115px}
 body.touch .bar{margin-top:3px;gap:5px}body.touch .bar svg{width:14px;height:14px}body.touch .bar .tr{height:12px}body.touch .bar b{font-size:12px;width:26px}
 body.touch #banner{font-size:18px;top:24%}body.touch #elim{font-size:13px;top:66%}
 body.touch #inv{right:auto;left:50%;transform:translateX(-50%);bottom:5px;gap:4px;pointer-events:auto}
-body.touch .slot{width:50px;height:50px;border-radius:7px}body.touch .slot.sel{transform:translateY(-4px)}
-body.touch .slot svg{width:40px;height:18px}body.touch .slot .k,body.touch .slot .n{display:none}body.touch .slot .a{font-size:10px;right:3px;bottom:0}
+body.touch .slot{width:60px;height:46px;border-radius:6px}body.touch .slot.sel{width:68px;height:54px}body.touch .slot.pk{width:50px;margin-right:4px}body.touch .slot.pk.sel{width:56px}
+body.touch .slot .k{display:none}body.touch .slot .a{font-size:11px;right:5px;bottom:4px}body.touch .slot:after{height:3px}
 body.touch #build{right:auto;left:50%;transform:translateX(-50%);bottom:62px;gap:4px;font-size:10px;pointer-events:auto;white-space:nowrap}
-body.touch .bs{padding:6px 8px}body.touch .bs svg{width:20px;height:11px}body.touch .mat{padding:6px 6px;font-size:11px}
+body.touch .bs{padding:6px 8px}body.touch .bs svg{width:20px;height:11px}body.touch .bs img{height:20px}body.touch .mat img{height:16px}body.touch .mat{padding:6px 6px;font-size:11px}
 body.touch #ammo{right:calc(128px + env(safe-area-inset-right));bottom:136px;font-size:18px}body.touch #ammo small{font-size:11px}
 body.touch #prompt{top:auto;bottom:116px;font-size:14px;padding:10px 14px;pointer-events:auto;border:2px solid var(--y)}
 body.touch #use{top:60%}body.touch #gain{font-size:14px}body.touch #speed{bottom:150px;font-size:20px}
