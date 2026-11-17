@@ -49,7 +49,7 @@ const humans = () => [...clients.values()].filter((c) => c.joined);
 const ents = () => humans().filter((c) => c.inMatch).concat(bots);
 const ent = (id) => { const c = clients.get(id); return c && c.inMatch ? c : bots.find((b) => b.id === id); };
 const alive = () => ents().filter((e) => e.alive);
-const roster = () => ents().map((e) => [e.id, e.name, e.hue, e.bot ? 1 : 0]);
+const roster = () => ents().map((e) => [e.id, e.name, e.hue, e.bot ? 1 : 0, e.style | 0]);
 const dist2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 // ---------- Beute
@@ -58,19 +58,19 @@ function rndWeapon(minR = 0) {
   const r = Math.max(minR, +wpick({ 0: 40, 1: 30, 2: 18, 3: 9, 4: 3 }));
   return { k: 'w', w, r, mag: S.W[w].mag };
 }
-function rndCons() { const c = wpick({ band: 35, mini: 30, pot: 20, med: 15 }); return { k: 'c', c, n: c === 'band' ? 5 : c === 'mini' ? 2 : 1 }; }
+function rndCons() { const c = wpick({ band: 30, mini: 26, pot: 17, med: 12, gren: 15 }); return { k: 'c', c, n: c === 'band' ? 5 : c === 'mini' || c === 'gren' ? 2 : 1 }; }
 function ammoFor(w) { const a = S.W[w].ammo; return { k: 'a', a, n: { light: 30, medium: 30, shells: 8, heavy: 6 }[a] }; }
 function addLoot(item, x, y, z, ann) {
   const l = { id: lootId++, x: +x.toFixed(2), y: +y.toFixed(2), z: +z.toFixed(2), i: item };
   world.loot.set(l.id, l);
-  if (ann) broadcast({ t: 'loot+', l });
+  if (ann) broadcast({ t: 'loot+', l, o: ann === true ? null : ann });
   return l;
 }
 function scatter(items, x, y, z, ann) {
   items.forEach((it, i) => {
     const a = (i / items.length) * 6.283 + Math.random(), r = 1.2 + Math.random() * 0.6;
     const lx = x + Math.cos(a) * r, lz = z + Math.sin(a) * r;
-    addLoot(it, lx, Math.max(y, S.height(lx, lz)), lz, ann);
+    addLoot(it, lx, Math.max(y, S.height(lx, lz)), lz, ann ? [+x.toFixed(1), +(y + 0.6).toFixed(1), +z.toFixed(1)] : false);
   });
 }
 
@@ -87,25 +87,27 @@ function addCar(id, x, z) { world.cars.set(id, { id, x: +x.toFixed(1), y: +S.hei
 function releaseCar(c) { if (!c.car) return; const car = world && world.cars.get(c.car); if (car) { car.drv = 0; car.dirty = 3; } c.car = null; c.fl &= ~16; }
 function explodeCar(car, attacker) {
   world.cars.delete(car.id); broadcast({ t: 'car-', id: car.id, x: car.x, y: car.y, z: car.z });
-  for (const e of ents()) { if (e.car === car.id) e.car = null; if (e.alive && Math.hypot(e.x - car.x, e.y - car.y, e.z - car.z) < 6.5) damage(e, e.id === car.drv ? 60 : 40, attacker, 'car'); }
+  for (const e of ents()) { if (e.car === car.id) e.car = null; const d = Math.hypot(e.x - car.x, e.y - car.y, e.z - car.z); if (e.alive && d < 6.5) damage(e, e.id === car.drv ? 60 : 40, attacker, 'car', false, [(e.x - car.x) / (d || 1) * 9, 7, (e.z - car.z) / (d || 1) * 9]); }
 }
 function genWorld() {
-  world = { objs: new Map(), chests: new Map(), pieces: new Map(), loot: new Map(), cars: new Map() };
+  world = { objs: new Map(), chests: new Map(), pieces: new Map(), loot: new Map(), cars: new Map(), houses: [] };
   let oid = 1;
   const rects = [];
   for (const poi of S.POIS) {
     const want = 4 + rnd(3);
     const placed = [];
     for (let tries = 0; tries < 80 && placed.length < want; tries++) {
-      const w = 2 + rnd(2), d = 2 + rnd(2);
-      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 17);
+      const big = poi.n === 'Turmstadt' && !placed.length;
+      const w = big ? 3 : 2 + rnd(2), d = big ? 3 : 2 + rnd(2);
+      const a = Math.random() * 6.283, rr = big ? 0 : Math.random() * (poi.r - 17);
       const cx = Math.floor((poi.x + Math.cos(a) * rr) / G) - (w >> 1), cz = Math.floor((poi.z + Math.sin(a) * rr) / G) - (d >> 1);
       if (placed.some((h) => cx < h.cx + h.w + 2 && cx + w + 2 > h.cx && cz < h.cz + h.d + 2 && cz + d + 2 > h.cz)) continue;
       placed.push({ cx, cz, w, d });
       rects.push({ cx, cz, w, d });
-      const mat = wpick({ wood: 45, stone: 40, metal: 15 });
-      const storeys = Math.random() < 0.45 ? 2 : 1;
+      const mat = big ? 'stone' : wpick({ wood: 45, stone: 40, metal: 15 });
+      const storeys = big ? 4 : Math.random() < 0.45 ? 2 : 1;
       const door = rnd(w);
+      world.houses.push([cx, cz, w, d, poi.l, storeys, door, mat[0]]);
       for (let s = 0; s < storeys; s++) {
         const iy = poi.l + s;
         for (let i = 0; i < w; i++) {
@@ -127,12 +129,21 @@ function genWorld() {
       const chx = (cx + ci + 0.5) * G, chz = (cz + cj + 0.5) * G;
       const ch = { id: oid++, x: chx, y: (poi.l + (top ? 1 : 0)) * H + (top ? 0.12 : 0), z: chz, open: 0 };
       world.chests.set(ch.id, ch);
+      if (big) for (let s2 = 1; s2 <= 4; s2++) { const c2 = { id: oid++, x: (cx + 1 + (s2 % 2) + 0.5) * G, y: (poi.l + s2) * H + 0.12, z: (cz + 0.5) * G, open: 0 }; world.chests.set(c2.id, c2); }
       if (Math.random() < 0.7) {
         const lx = (cx + rnd(w) + 0.5) * G, lz = (cz + 0.5) * G;
         const it = Math.random() < 0.6 ? rndWeapon() : rndCons();
         addLoot(it, lx, poi.l * H, lz);
         if (it.k === 'w') addLoot(ammoFor(it.w), lx + 0.8, poi.l * H, lz + 0.5);
       }
+    }
+    // Kisten und Fässer
+    for (let i = 0, t = 0; i < 7 && t < 60; t++) {
+      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 3);
+      const x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr, cx = x / G, cz = z / G;
+      if (placed.some((h) => cx > h.cx - 0.4 && cx < h.cx + h.w + 0.4 && cz > h.cz - 0.4 && cz < h.cz + h.d + 0.4)) continue;
+      const tp = Math.random() < 0.6 ? 'crate' : 'barrel';
+      world.objs.set(oid, { id: oid++, t: tp, x: +x.toFixed(1), z: +z.toFixed(1), s: tp === 'crate' ? +(0.8 + Math.random() * 0.5).toFixed(2) : 1, hp: 68 }); i++;
     }
     // Autos
     for (let i = 0, t = 0; i < 4 && t < 40; t++) {
@@ -155,6 +166,19 @@ function genWorld() {
     if (S.height(x, z) < 0.3 || S.poiAt(x, z, 2)) continue;
     world.objs.set(oid, { id: oid++, t: 'rock', x: +x.toFixed(1), z: +z.toFixed(1), s: +(0.7 + Math.random() * 0.9).toFixed(2), hp: 150 });
   }
+  // Wachtürme
+  for (let i = 0, t = 0; i < 8 && t < 80; t++) {
+    const a = Math.random() * 6.283, rr = 40 + Math.sqrt(Math.random()) * 165, x = Math.cos(a) * rr, z = Math.sin(a) * rr, h = S.height(x, z);
+    if (h < 2 || S.poiAt(x, z, 14) || S.roadDist(x, z) < 6) continue;
+    const cx = Math.floor(x / G), cz = Math.floor(z / G), l = Math.floor((h + 0.4) / H), mat = Math.random() < 0.5 ? 'wood' : 'metal';
+    if (rects.some((r) => Math.abs(r.cx - cx) < 6 && Math.abs(r.cz - cz) < 6)) continue;
+    rects.push({ cx, cz, w: 2, d: 2 });
+    for (let s = 0; s < 3; s++) addPiece({ t: 'r', ix: cx, iy: l + s, iz: cz, rot: s % 2 ? 2 : 0, mat });
+    for (const [a2, b2] of [[0, 1], [1, 1], [1, 0]]) addPiece({ t: 'f', ix: cx + a2, iy: l + 3, iz: cz + b2, mat });
+    for (let s = 0; s < 3; s++) { addPiece({ t: 'w', ix: cx + 1, iy: l + s, iz: cz, d: 1, mat }); addPiece({ t: 'w', ix: cx, iy: l + s, iz: cz, d: 1, mat }); }
+    const tc = { id: oid++, x: (cx + 1.5) * G, y: (l + 3) * H + 0.12, z: (cz + 1.5) * G, open: 0 }; world.chests.set(tc.id, tc);
+    i++;
+  }
   for (let i = 0; i < 12; i++) {
     const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 210, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
     if (S.height(x, z) > 1.5 && !S.poiAt(x, z, 4)) addCar(oid++, x, z);
@@ -174,8 +198,17 @@ function genWorld() {
     addLoot(it, x, y, z);
     if (it.k === 'w') addLoot(ammoFor(it.w), x + 0.9, S.height(x + 0.9, z), z);
   }
+  // Objekte, die in Bauteilen oder auf Straßen stehen, entfernen; Raster für Bots
+  world.grid = new Map();
+  for (const o of [...world.objs.values()]) {
+    const cx = o.x / G, cz = o.z / G;
+    if ((o.t === 'tree' || o.t === 'rock') && (S.roadDist(o.x, o.z) < 4.5 || rects.some((r) => cx > r.cx - 0.6 && cx < r.cx + r.w + 0.6 && cz > r.cz - 1.6 && cz < r.cz + r.d + 0.6))) { world.objs.delete(o.id); continue; }
+    o.r = o.t === 'tree' ? 0.45 * o.s : o.t === 'rock' ? 1.25 * o.s : o.t === 'crate' ? 0.75 * o.s : 0.55;
+    const k = Math.floor(o.x / 16) + ',' + Math.floor(o.z / 16);
+    if (!world.grid.has(k)) world.grid.set(k, []); world.grid.get(k).push(o);
+  }
 }
-const packWorld = () => ({ objs: [...world.objs.values()], chests: [...world.chests.values()], pieces: [...world.pieces.values()], loot: [...world.loot.values()], cars: [...world.cars.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v, hue: c.hue, drv: c.drv })) });
+const packWorld = () => ({ objs: [...world.objs.values()], chests: [...world.chests.values()], pieces: [...world.pieces.values()], loot: [...world.loot.values()], houses: world.houses, cars: [...world.cars.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v, hue: c.hue, drv: c.drv })) });
 
 // ---------- Sturm
 function chooseNext() {
@@ -204,20 +237,24 @@ function tickStorm(dt) {
 }
 
 // ---------- Schaden
-function damage(target, amount, attacker, wname, head) {
+function damage(target, amount, attacker, wname, head, kb) {
   if (phase !== 'game' || !target || !target.alive || (target.fl & 1) || amount <= 0) return;
   const sh0 = target.sh;
   let d = amount;
   const s = Math.min(target.sh, d); target.sh -= s; d -= s; target.hp -= d;
-  if (attacker && !attacker.bot) send(attacker, { t: 'dmg', id: target.id, n: Math.round(amount), head: head ? 1 : 0, sh: sh0 > 0 ? 1 : 0 });
-  if (!target.bot) send(target, { t: 'hurt', ax: attacker ? attacker.x : null, az: attacker ? attacker.z : null });
-  if (target.hp <= 0) kill(target, attacker, wname);
+  if (attacker && !attacker.bot) send(attacker, { t: 'dmg', id: target.id, n: Math.round(amount), head: head ? 1 : 0, sh: sh0 > 0 ? 1 : 0, brk: sh0 > 0 && target.sh <= 0 ? 1 : 0 });
+  if (!target.bot) send(target, { t: 'hurt', ax: attacker ? attacker.x : null, az: attacker ? attacker.z : null, kb: kb || null });
+  if (target.hp <= 0) { kill(target, attacker, wname); return; }
+  if (target.bot && attacker && attacker !== target && target.st === 'ground') {
+    target.threat = attacker; target.threatT = gameT + 5;
+    if (gameT >= target.nextWall && wname !== 'pick' && wname !== 'car' && Math.random() < 0.45 * target.skill) { target.nextWall = gameT + 4 + Math.random() * 5; botWall(target, attacker); }
+  }
 }
 function kill(target, attacker, wname) {
   if (!target.alive) return;
   target.alive = false; target.hp = 0;
   const place = alive().length + 1;
-  if (attacker && attacker !== target) attacker.kills++;
+  if (attacker && attacker !== target) { attacker.kills++; if (attacker.bot) attacker.emoteT = gameT + 2.4; }
   releaseCar(target);
   broadcast({ t: 'kill', v: target.id, k: attacker && attacker !== target ? attacker.id : 0, w: wname, place, kills: attacker ? attacker.kills : 0 });
   if (target.bot && phase === 'game') {
@@ -245,8 +282,9 @@ function hitPiece(key, dmg) {
 const BN = ['Flitzer', 'Keks', 'Wolke', 'Pixel', 'Brumm', 'Zack', 'Mango', 'Nebel', 'Turbo', 'Fuchs', 'Kiesel', 'Rakete', 'Socke', 'Blitz', 'Krümel', 'Otter', 'Zimt', 'Kaktus', 'Nudel', 'Falke'];
 function shipPos() { const k = Math.min(1.15, gameT / ship.dur); return { x: lerp(ship.ax, ship.bx, k), z: lerp(ship.az, ship.bz, k) }; }
 function makeBot(name) {
-  return { id: nextId++, bot: true, name, hue: rnd(360), inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, yaw: 0, pitch: 0, w: 'pick',
-    st: 'ship', jumpAt: 5 + Math.random() * 20, tx: 0, tz: 0, wx: 0, wz: 0, wpn: null, armAt: 0, nextShot: 0, tgt: null, nextScan: Math.random(), strafe: 1, nextStrafe: 0, nextWp: 0, nextHack: 0 };
+  return { id: nextId++, bot: true, name, hue: rnd(360), style: rnd(16), wr: 0, inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, yaw: 0, pitch: 0, w: 'pick',
+    st: 'ship', jumpAt: 5 + Math.random() * 20, tx: 0, tz: 0, wx: 0, wz: 0, wpn: null, armAt: 0, nextShot: 0, tgt: null, nextScan: Math.random(), strafe: 1, nextStrafe: 0, nextWp: 0, nextHack: 0,
+    skill: 0.6 + Math.random() * 0.7, jy: 0, jv: 0, stuck: 0, detourT: 0, detourA: 0, swT: 0, coverT: 0, relT: 0, relDone: false, emoteT: 0, mag: 0, burst: 4, threat: null, threatT: 0, nextWall: 0, seen: null, chest: null, nextChest: 0 };
 }
 function startMatch() {
   genWorld(); gameT = 0; phase = 'game'; noHumansT = 0; stormAcc = 0;
@@ -256,7 +294,7 @@ function startMatch() {
   chooseNext();
   bots = [];
   const hs = humans();
-  for (const c of hs) Object.assign(c, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, w: 'pick', lastShot: {}, lastHarvest: 0, car: null, lastRam: 0 });
+  for (const c of hs) Object.assign(c, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, w: 'pick', wr: 0, lastShot: {}, lastHarvest: 0, car: null, lastRam: 0, nades: 0, lastNade: 0 });
   const names = BN.slice().sort(() => Math.random() - 0.5);
   for (let i = hs.length; i < TOTAL; i++) bots.push(makeBot(names[i % names.length] + (10 + rnd(89))));
   broadcast({ t: 'start', world: packWorld(), ship, roster: roster() });
@@ -282,16 +320,39 @@ function los(a, e, d) {
   const dx = e.x - a.x, dy = e.y + 1.2 - (a.y + 1.5), dz = e.z - a.z, l = Math.hypot(dx, dy, dz) || 1;
   return !S.rayPieces(a.x, a.y + 1.5, a.z, dx / l, dy / l, dz / l, l, world.pieces);
 }
+function blockedObj(x, z) {
+  const gx = Math.floor(x / 16), gz = Math.floor(z / 16);
+  for (let a = gx - 1; a <= gx + 1; a++) for (let b = gz - 1; b <= gz + 1; b++) {
+    const arr = world.grid.get(a + ',' + b); if (!arr) continue;
+    for (const o of arr) { if (!world.objs.has(o.id)) continue; const r = o.r + 0.4, dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < r * r) return true; }
+  }
+  for (const c of world.cars.values()) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < 4.4) return true; }
+  return false;
+}
 function moveBot(b, dx, dz, speed, dt) {
-  const l = Math.hypot(dx, dz); if (l < 1e-6) return false;
+  let l = Math.hypot(dx, dz); if (l < 1e-6) return false;
   dx /= l; dz /= l;
+  if (b.detourT > gameT) { const cs = Math.cos(b.detourA), sn = Math.sin(b.detourA), x = dx * cs - dz * sn; dz = dx * sn + dz * cs; dx = x; }
   const step = speed * dt;
-  const hit = S.rayPieces(b.x, b.y + 1, b.z, dx, 0, dz, step + 0.7, world.pieces);
-  if (hit) { if (gameT >= b.nextHack) { b.nextHack = gameT + 0.45; hitPiece(hit.key, 50); } return false; }
+  const hit = S.rayPieces(b.x, b.y - b.jy + 1, b.z, dx, 0, dz, step + 0.7, world.pieces);
+  if (hit) {
+    b.stuck += dt;
+    if (b.stuck > 1.3) { if (gameT >= b.nextHack) { b.nextHack = gameT + 0.45; b.swT = gameT + 0.3; hitPiece(hit.key, 50); } }
+    else if (!(b.detourT > gameT)) { b.detourT = gameT + 0.9; b.detourA = (Math.random() < 0.5 ? 1 : -1) * 1.45; }
+    return false;
+  }
   const nx = b.x + dx * step, nz = b.z + dz * step;
-  if (S.height(nx, nz) < 0.15) { newWaypoint(b, true); return false; }
-  b.x = nx; b.z = nz; b.y = S.height(nx, nz);
+  if (S.height(nx, nz) < 0.15) { newWaypoint(b, true); if (!(b.detourT > gameT)) { b.detourT = gameT + 1.2; b.detourA = Math.PI * (0.6 + Math.random() * 0.8); } return false; }
+  if (blockedObj(nx, nz)) { if (!(b.detourT > gameT)) { b.detourT = gameT + 0.45; b.detourA = (Math.random() < 0.5 ? 1 : -1) * 1.25; } return false; }
+  b.x = nx; b.z = nz; b.stuck = Math.max(0, b.stuck - dt * 2);
   return true;
+}
+function armBot(b, w, r) { b.wpn = { w, r }; b.w = w; b.wr = r; b.mag = S.W[w].mag; b.burst = 3 + rnd(5); }
+function botWall(b, a) {
+  const dx = a.x - b.x, dz = a.z - b.z, ax = Math.abs(dx) > Math.abs(dz), pcx = Math.floor(b.x / G), pcz = Math.floor(b.z / G);
+  const p = ax ? { t: 'w', d: 1, ix: dx > 0 ? pcx + 1 : pcx, iz: pcz } : { t: 'w', d: 0, ix: pcx, iz: dz > 0 ? pcz + 1 : pcz };
+  p.iy = Math.floor((b.y - b.jy + 0.4) / H); p.mat = Math.random() < 0.7 ? 'wood' : 'stone';
+  if (addPiece(p, true)) { b.coverT = gameT + 1.6 + Math.random() * 1.6; b.swT = gameT + 0.2; }
 }
 function botTick(b, dt) {
   if (!b.alive) return;
@@ -312,38 +373,54 @@ function botTick(b, dt) {
     if (l > 0.5) { const s = Math.min(l, 16 * dt); b.x += (dx / l) * s; b.z += (dz / l) * s; b.yaw = Math.atan2(-dx, -dz); }
     const g = S.height(b.x, b.z), hi = b.y - g > 34;
     b.fl = hi ? 2 : 4; b.y -= (hi ? 28 : 8) * dt;
-    if (b.y <= g) { b.y = g; b.st = 'ground'; b.fl = 0; b.armAt = gameT + 9 + Math.random() * 14; newWaypoint(b); }
+    if (b.y <= g) { b.y = g; b.st = 'ground'; b.fl = 0; b.armAt = gameT + 14 + Math.random() * 10; b.chest = null; b.nextChest = 0; newWaypoint(b); }
     return;
   }
-  if (!b.wpn && gameT >= b.armAt) {
-    b.wpn = { w: wpick({ ar: 35, smg: 25, shotgun: 25, pistol: 15 }), r: +wpick({ 0: 50, 1: 30, 2: 15, 3: 5 }) };
-    b.w = b.wpn.w; b.sh = pick([0, 0, 25, 50, 50]);
-  }
+  // Springen
+  if (b.jy > 0 || b.jv > 0) { b.jv -= 22 * dt; b.jy += b.jv * dt; if (b.jy <= 0) { b.jy = 0; b.jv = 0; } }
+  if (!b.wpn && gameT >= b.armAt) armBot(b, wpick({ ar: 35, smg: 25, shotgun: 25, pistol: 15 }), +wpick({ 0: 50, 1: 30, 2: 15, 3: 5 }));
   if (gameT >= b.nextScan) {
-    b.nextScan = gameT + 0.5;
-    let best = null, bd = 70;
+    b.nextScan = gameT + 0.45;
+    let best = null, bd = 72;
     for (const e of ents()) {
       if (e === b || !e.alive || (e.fl & 7)) continue;
       const d = Math.hypot(e.x - b.x, e.y - b.y, e.z - b.z);
       if (d < bd && los(b, e, d)) { bd = d; best = e; }
     }
-    if (best !== b.tgt) { b.tgt = best; b.nextShot = gameT + 0.7 + Math.random() * 0.6; }
-    if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 4) newWaypoint(b, true);
+    const th = b.threat;
+    if (th && th.alive && b.threatT > gameT && th !== best) { const d = Math.hypot(th.x - b.x, th.y - b.y, th.z - b.z); if (d < 95 && los(b, th, d)) best = th; }
+    if (best !== b.tgt) { b.tgt = best; b.nextShot = Math.max(b.nextShot, gameT + (0.55 + Math.random() * 0.5) / b.skill); }
+    if (best) b.seen = { x: best.x, z: best.z, t: gameT };
+    if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 5) { newWaypoint(b, true); b.chest = null; }
+    // Truhe suchen
+    if (!b.wpn && !b.chest && gameT >= b.nextChest) {
+      b.nextChest = gameT + 3; let cd = 75;
+      for (const ch of world.chests.values()) { if (ch.open || (ch.bot && ch.bot !== b.id) || Math.abs(ch.y - S.height(ch.x, ch.z)) > 0.5) continue; const d = Math.hypot(ch.x - b.x, ch.z - b.z); if (d < cd) { cd = d; b.chest = ch; } }
+      if (b.chest) b.chest.bot = b.id;
+    }
   }
-  const t = b.tgt;
+  const t = b.tgt, crouchNow = b.coverT > gameT, reloading = b.relT > gameT;
+  let fl = 0, moved = false;
+  if (b.relDone && !reloading) { b.relDone = false; b.mag = S.W[b.wpn.w].mag; }
+  if (b.emoteT > gameT && !t) { b.fl = 256; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
   if (t && t.alive && b.wpn) {
     const dx = t.x - b.x, dz = t.z - b.z, d = Math.hypot(dx, dz) || 1, d3 = Math.hypot(dx, t.y - b.y, dz);
     b.yaw = Math.atan2(-dx, -dz); b.pitch = Math.atan2(t.y - b.y, d);
-    if (gameT >= b.nextStrafe) { b.strafe = Math.random() < 0.5 ? -1 : 1; b.nextStrafe = gameT + 0.8 + Math.random() * 1.4; }
-    const want = b.wpn.w === 'shotgun' ? 7 : 18;
-    const f = d > want + 3 ? 1 : d < want - 3 ? -0.7 : 0;
-    moveBot(b, (dx / d) * f + (-dz / d) * b.strafe * 0.7, (dz / d) * f + (dx / d) * b.strafe * 0.7, 4.2, dt);
-    if (gameT >= b.nextShot) {
+    if (gameT >= b.nextStrafe) { b.strafe = Math.random() < 0.5 ? -1 : 1; b.nextStrafe = gameT + 0.7 + Math.random() * 1.3; if (d < 22 && b.jy === 0 && Math.random() < 0.3 * b.skill) b.jv = 7.2; }
+    const want = { shotgun: 7, smg: 13, pistol: 16, ar: 22 }[b.wpn.w] || 18;
+    const f = crouchNow ? 0 : d > want + 3 ? 1 : d < want - 3 ? -0.7 : 0, sf = crouchNow ? 0.25 : 0.75;
+    moved = moveBot(b, (dx / d) * f + (-dz / d) * b.strafe * sf, (dz / d) * f + (dx / d) * b.strafe * sf, crouchNow ? 2 : 4.4, dt);
+    if (crouchNow) fl |= 8;
+    if (d3 > 24 && !reloading) fl |= 64;
+    if (crouchNow && b.hp < 75) b.hp = Math.min(75, b.hp + 9 * dt);
+    if (gameT >= b.nextShot && !reloading && !crouchNow) {
       const W = S.W[b.wpn.w];
-      b.nextShot = gameT + (W.rate / 1000) * 1.7 + Math.random() * 0.15;
+      b.nextShot = gameT + (W.rate / 1000) * 1.5 + Math.random() * 0.1;
+      if (--b.burst <= 0 && W.rate < 300) { b.burst = 3 + rnd(6); b.nextShot += 0.35 + Math.random() * 0.6; }
+      if (--b.mag <= 0) { b.relT = gameT + W.rel; b.relDone = true; }
       const clear = los(b, t, d3);
-      let p = Math.min(0.3, Math.max(0.05, 0.36 - d3 / 190));
-      if (t.fl & 8) p *= 0.8;
+      let p = Math.min(0.36, Math.max(0.06, 0.42 - d3 / 170)) * b.skill;
+      if (t.fl & 8) p *= 0.8; if (t.fl & 16) p *= 0.6;
       let n = 0;
       if (clear) for (let i = 0; i < W.pellets; i++) if (Math.random() < p) n++;
       const miss = n ? 0 : 1.5;
@@ -351,12 +428,39 @@ function botTick(b, dt) {
       if (n) damage(t, S.wdmg(b.wpn.w, b.wpn.r, d3, false) * n * (t.bot ? 0.3 : 1), b, b.wpn.w, false);
       else if (!clear) { const l = d3 || 1, h = S.rayPieces(b.x, b.y + 1.5, b.z, dx / l, (t.y + 1.2 - b.y - 1.5) / l, dz / l, l, world.pieces); if (h) hitPiece(h.key, W.dmg * W.pellets * 0.5); }
     }
+  } else if (t && t.alive && !b.wpn && Math.hypot(t.x - b.x, t.z - b.z) < 9) {
+    // unbewaffnet: Spitzhacke
+    const dx = t.x - b.x, dz = t.z - b.z, d = Math.hypot(dx, dz) || 1;
+    b.yaw = Math.atan2(-dx, -dz); b.pitch = 0;
+    if (d > 1.8) moved = moveBot(b, dx, dz, 5.6, dt);
+    else if (gameT >= b.nextHack) { b.nextHack = gameT + 0.55; b.swT = gameT + 0.3; damage(t, 20 * (t.bot ? 0.5 : 1), b, 'pick'); }
   } else {
     b.pitch = 0;
-    const dx = b.wx - b.x, dz = b.wz - b.z;
-    if (Math.hypot(dx, dz) < 3 || gameT >= b.nextWp) newWaypoint(b);
-    else { b.yaw = Math.atan2(-dx, -dz); moveBot(b, dx, dz, 5, dt); }
+    let gx = b.wx, gz = b.wz, sp = 5;
+    if (!b.wpn && b.chest && !b.chest.open) { gx = b.chest.x; gz = b.chest.z; sp = 5.8; }
+    else if (b.seen && gameT - b.seen.t < 4 && b.wpn) { gx = b.seen.x; gz = b.seen.z; sp = 5.6; }
+    else if (b.chest) b.chest = null;
+    const dx = gx - b.x, dz = gz - b.z, d = Math.hypot(dx, dz);
+    if (b.chest && d < 2.3) {
+      const items = openChest(b.chest), w = items.find((i) => i.k === 'w');
+      armBot(b, w.w, w.r);
+      if (items.some((i) => i.c === 'pot' || i.c === 'mini')) b.sh = Math.min(100, b.sh + 50);
+      scatter(items.filter((i) => i !== w && i.c !== 'pot' && i.c !== 'mini'), b.chest.x, b.chest.y, b.chest.z, true);
+      b.chest = null;
+    } else if (d < 2.5 || gameT >= b.nextWp) { if (!b.chest) newWaypoint(b); b.seen = null; }
+    else { b.yaw = Math.atan2(-dx, -dz); moved = moveBot(b, dx, dz, sp, dt); }
+    if (b.hp < 75) { b.hp = Math.min(75, b.hp + 5 * dt); }
   }
+  if (reloading) fl |= 32;
+  if (b.swT > gameT) fl |= 128;
+  b.fl = fl; b.w = b.swT > gameT || !b.wpn ? 'pick' : b.wpn.w;
+  b.y = S.height(b.x, b.z) + b.jy;
+}
+function openChest(ch) {
+  ch.open = 1; broadcast({ t: 'chest', id: ch.id });
+  const w = rndWeapon(Math.random() < 0.35 ? 2 : 0), items = [w, ammoFor(w.w), { k: 'm', m: pick(['wood', 'stone', 'metal']), n: 30 }];
+  if (Math.random() < 0.65) items.push(rndCons());
+  return items;
 }
 
 // ---------- Tick
@@ -388,7 +492,7 @@ setInterval(() => {
     }
   }
   const p = [];
-  for (const e of ents()) if (e.alive) p.push([e.id, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), +e.pitch.toFixed(2), Math.ceil(e.hp), Math.ceil(e.sh), e.fl, e.w]);
+  for (const e of ents()) if (e.alive) p.push([e.id, +e.x.toFixed(2), +e.y.toFixed(2), +e.z.toFixed(2), +e.yaw.toFixed(2), +e.pitch.toFixed(2), Math.ceil(e.hp), Math.ceil(e.sh), e.fl, e.w, e.wr | 0]);
   const sp = shipPos(), cs = [];
   for (const c of world.cars.values()) if (c.dirty > 0) { c.dirty--; cs.push([c.id, +c.x.toFixed(2), +c.y.toFixed(2), +c.z.toFixed(2), +c.yaw.toFixed(2), c.drv]); }
   broadcast({ t: 's', ph: phase, p, cs, al: p.length, gt: +gameT.toFixed(1),
@@ -397,7 +501,7 @@ setInterval(() => {
 }, 66);
 
 // ---------- Nachrichten
-const WCODES = new Set(['pick', 'build', 'heal', ...Object.keys(S.W)]);
+const WCODES = new Set(['pick', 'build', 'none', ...Object.keys(S.W), ...Object.keys(S.CONS)]);
 function cleanItem(it) {
   if (!it || typeof it !== 'object') return null;
   if (it.k === 'w' && S.W[it.w]) return { k: 'w', w: it.w, r: Math.min(4, Math.max(0, it.r | 0)), mag: Math.min(S.W[it.w].mag, Math.max(0, it.mag | 0)) };
@@ -410,7 +514,7 @@ function onMsg(c, m) {
   if (m.t === 'join') {
     if (c.joined) return;
     c.name = String(m.name || '').replace(/[<>&"']/g, '').trim().slice(0, 14) || 'Spieler' + c.id;
-    c.joined = true;
+    c.joined = true; c.hue = Math.min(359, Math.max(0, m.hue | 0)); c.style = (m.style | 0) & 15;
     send(c, { t: 'init', id: c.id, phase, world: phase !== 'lobby' ? packWorld() : null, ship, roster: phase !== 'lobby' ? roster() : [] });
     return;
   }
@@ -420,7 +524,7 @@ function onMsg(c, m) {
     case 'pos':
       if (!c.alive) return;
       c.x = num(m.x, c.x); c.y = num(m.y, c.y); c.z = num(m.z, c.z); c.yaw = num(m.yaw); c.pitch = num(m.pitch);
-      c.fl = (m.fl | 0) & 239; c.w = WCODES.has(m.w) ? m.w : 'pick';
+      c.fl = (m.fl | 0) & 495; c.wr = Math.min(4, Math.max(0, m.wr | 0)); c.w = WCODES.has(m.w) ? m.w : 'pick';
       if (gameT > ship.dur + 2) c.fl &= ~1;
       if (c.car) { const car = world.cars.get(c.car); if (car) { c.fl |= 16; car.x = c.x; car.y = c.y; car.z = c.z; car.yaw = num(m.cy); car.dirty = 2; } else c.car = null; }
       break;
@@ -450,7 +554,7 @@ function onMsg(c, m) {
       if (m.k === 'o') {
         const o = world.objs.get(m.id | 0); if (!o || Math.hypot(o.x - c.x, o.z - c.z) > 8) return;
         o.hp -= 34;
-        const mat = o.t === 'tree' ? 'wood' : o.t === 'rock' ? 'stone' : 'metal';
+        const mat = o.t === 'tree' || o.t === 'crate' ? 'wood' : o.t === 'rock' ? 'stone' : 'metal';
         send(c, { t: 'mat', m: mat, n: o.t === 'tree' ? 20 : 15 });
         if (o.hp <= 0) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
       } else if (m.k === 'p') {
@@ -482,10 +586,7 @@ function onMsg(c, m) {
     }
     case 'open': {
       const ch = world.chests.get(m.id | 0); if (!live || !ch || ch.open || Math.hypot(ch.x - c.x, ch.y - c.y, ch.z - c.z) > 6) return;
-      ch.open = 1; broadcast({ t: 'chest', id: ch.id });
-      const w = rndWeapon(Math.random() < 0.35 ? 2 : 0), items = [w, ammoFor(w.w), { k: 'm', m: pick(['wood', 'stone', 'metal']), n: 30 }];
-      if (Math.random() < 0.65) items.push(rndCons());
-      scatter(items, ch.x, ch.y, ch.z, true);
+      scatter(openChest(ch), ch.x, ch.y, ch.z, true);
       break;
     }
     case 'drop': { const it = cleanItem(m.i); if (live && it) addLoot(it, c.x + (Math.random() - 0.5), c.y, c.z + (Math.random() - 0.5), true); break; }
@@ -494,6 +595,26 @@ function onMsg(c, m) {
       c.dropped = true;
       scatter(m.items.slice(0, 14).map(cleanItem).filter(Boolean), c.x, c.y, c.z, true);
       break;
+    case 'nade':
+      if (!live || !Array.isArray(m.o) || !Array.isArray(m.v) || (c.fl & 7)) return;
+      c.nades = (c.nades || 0) + 1; c.lastNade = Date.now();
+      broadcast({ t: 'nade', id: c.id, o: m.o.slice(0, 3).map((v) => +num(v).toFixed(2)), v: m.v.slice(0, 3).map((v) => +Math.max(-40, Math.min(40, num(v))).toFixed(2)) }, c);
+      break;
+    case 'boom': {
+      if (phase !== 'game' || !(c.nades > 0) || Date.now() - c.lastNade > 8000) return;
+      c.nades--;
+      const x = num(m.x), y = num(m.y), z = num(m.z);
+      broadcast({ t: 'boom', x, y, z }, c);
+      for (const e of ents()) {
+        if (!e.alive || (e.fl & 1)) continue;
+        const d = Math.hypot(e.x - x, e.y + 0.9 - y, e.z - z);
+        if (d < 6.5) damage(e, 12 + 98 * (1 - d / 6.5), c, 'gren', false, [(e.x - x) / (d || 1) * 10, 7.5, (e.z - z) / (d || 1) * 10]);
+      }
+      for (const p of [...world.pieces.values()]) if (Math.hypot((p.ix + 0.5) * G - x, (p.iy + 0.5) * H - y, (p.iz + 0.5) * G - z) < 5) hitPiece(p.key, 330);
+      for (const car of [...world.cars.values()]) if (Math.hypot(car.x - x, car.y - y, car.z - z) < 5) { car.hp -= 260; if (car.hp <= 0) explodeCar(car, c); }
+      for (const o of [...world.objs.values()]) if ((o.t === 'crate' || o.t === 'barrel') && Math.hypot(o.x - x, o.z - z) < 4.5) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
+      break;
+    }
     case 'heal': {
       if (!live) return;
       if (m.c === 'med') c.hp = 100; else if (m.c === 'band') c.hp = Math.max(c.hp, Math.min(75, c.hp + 15));

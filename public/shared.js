@@ -22,7 +22,9 @@
   S.height = function (x, z) {
     let h = 7.5 + 4 * Math.sin(x * 0.021 + 1.3) * Math.cos(z * 0.017 - 0.4) + 2.6 * Math.sin(x * 0.047 + z * 0.031) + 1.3 * Math.cos(x * 0.09 - z * 0.07 + 2);
     const mx = x - 75, mz = z + 25;
-    h += 15 * Math.exp(-(mx * mx + mz * mz) / 1500);
+    h += 19 * Math.exp(-(mx * mx + mz * mz) / 1500);
+    const lx = x + 62, lz = z - 8; h -= 7.6 * Math.exp(-(lx * lx + lz * lz) / 420);
+    const l2x = x - 105, l2z = z - 95; h -= 11.4 * Math.exp(-(l2x * l2x + l2z * l2z) / 300);
     const d = Math.hypot(x, z);
     const e = 1 - sm(S.R - 75, S.R - 8, d);
     h = -5 + (h + 5) * e;
@@ -58,10 +60,25 @@
     band: { n: 'Verband', s: 'VERBAND', t: 2.2, max: 15, col: '#f2f2f2' },
     pot: { n: 'Schildtrank', s: 'SCHILD', t: 3.5, max: 3, col: '#2f7bff' },
     mini: { n: 'Kleiner Schildtrank', s: 'MINI', t: 1.8, max: 6, col: '#6fd3ff' },
+    gren: { n: 'Granate', s: 'GRANATE', t: 0, max: 6, col: '#8fbf4a' },
   };
   S.AMMO = { light: 'Leichte Munition', medium: 'Mittlere Munition', shells: 'Schrot', heavy: 'Schwere Munition' };
   S.MATS = { wood: { n: 'Holz', hp: 150 }, stone: { n: 'Stein', hp: 300 }, metal: { n: 'Metall', hp: 450 } };
   S.COST = 10;
+  // Rückstoß (rec), Streuungszuwachs pro Schuss (bloom)
+  const REC = { ar: [0.011, 0.006], smg: [0.007, 0.005], shotgun: [0.05, 0], pistol: [0.016, 0.009], sniper: [0.075, 0] };
+  for (const k in REC) { S.W[k].rec = REC[k][0]; S.W[k].bloom = REC[k][1]; }
+  S.ROADS = [[0, 4], [1, 4], [2, 4], [3, 4], [5, 4], [6, 4], [0, 1], [2, 3], [5, 6]];
+  S.roadDist = function (x, z) {
+    let best = 1e9;
+    for (const r of S.ROADS) {
+      const a = S.POIS[r[0]], b = S.POIS[r[1]], dx = b.x - a.x, dz = b.z - a.z;
+      const t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
+      const px = a.x + dx * t + Math.sin(t * 9 + r[0]) * 6, pz = a.z + dz * t + Math.cos(t * 7 + r[1]) * 6;
+      const d = Math.hypot(x - px, z - pz); if (d < best) best = d;
+    }
+    return best;
+  };
   S.STORM = [
     { wait: 75, shrink: 40, f: 0.5, dmg: 1 },
     { wait: 40, shrink: 30, f: 0.27, dmg: 2 },

@@ -42,10 +42,11 @@ const WDEF = {
     cyl(0.016, 0.016, 0.2, 8, { r: [HP, 0, 0], p: [0, 0.08, 0.62], c: D }), cyl(0.026, 0.026, 0.07, 8, { r: [HP, 0, 0], p: [0, 0.08, 0.74], c: M }),
     box(0.055, 0.11, 0.26, { r: [0.08, 0, 0], p: [0, 0.045, -0.2], c: 0x9a7b4f }), box(0.06, 0.13, 0.03, { p: [0, 0.04, -0.34], c: D }),
     box(0.05, 0.12, 0.06, { r: [-0.25, 0, 0], p: [0, -0.05, -0.02], c: D }),
-    box(0.02, 0.05, 0.12, { p: [0, 0.155, 0.1], c: D }), box(0.015, 0.05, 0.02, { p: [0, 0.14, 0.5], c: D }),
+    box(0.03, 0.03, 0.14, { p: [0, 0.145, 0.1], c: D }), box(0.036, 0.05, 0.02, { p: [0, 0.18, 0.05], c: M }), box(0.036, 0.05, 0.02, { p: [0, 0.18, 0.15], c: M }), box(0.015, 0.05, 0.02, { p: [0, 0.14, 0.5], c: D }),
+    box(0.012, 0.035, 0.09, { p: [0, -0.01, 0.07], c: D }), box(0.082, 0.02, 0.2, { p: [0, 0.03, 0.4], c: D }),
   ],
   smg: () => [
-    box(0.07, 0.11, 0.3, { p: [0, 0.06, 0.08], c: D }), box(0.074, 0.03, 0.22, { p: [0, 0.1, 0.08], c: 0x2f6fd0 }),
+    box(0.07, 0.11, 0.3, { p: [0, 0.06, 0.08], c: D }), box(0.012, 0.03, 0.08, { p: [0, -0.01, 0.06], c: D }),
     cyl(0.02, 0.02, 0.14, 8, { r: [HP, 0, 0], p: [0, 0.07, 0.3], c: M }), cyl(0.03, 0.03, 0.08, 8, { r: [HP, 0, 0], p: [0, 0.07, 0.38], c: D }),
     box(0.05, 0.12, 0.06, { r: [-0.2, 0, 0], p: [0, -0.05, -0.02], c: D }),
     box(0.02, 0.03, 0.24, { p: [0, 0.09, -0.19], c: M }), box(0.04, 0.1, 0.025, { p: [0, 0.06, -0.31], c: M }),
@@ -80,11 +81,19 @@ const WMOVE = {
   sniper: () => [box(0.045, 0.1, 0.09, { p: [0, -0.03, 0.14], c: D })],
 };
 export const MUZZLE = { ar: 0.78, smg: 0.42, shotgun: 0.73, pistol: 0.2, sniper: 1.03 };
+const WACC = {
+  ar: () => [box(0.078, 0.05, 0.2, { p: [0, 0.06, 0.1], c: 0xffffff }), box(0.05, 0.03, 0.05, { p: [0, -0.16, 0.165], c: 0xffffff })],
+  smg: () => [box(0.076, 0.03, 0.22, { p: [0, 0.1, 0.08], c: 0xffffff }), box(0.045, 0.03, 0.065, { p: [0, -0.23, 0.1], c: 0xffffff })],
+  shotgun: () => [box(0.07, 0.04, 0.2, { p: [0, 0.075, 0.02], c: 0xffffff }), cyl(0.03, 0.03, 0.03, 8, { r: [HP, 0, 0], p: [0, 0.09, 0.72], c: 0xffffff })],
+  pistol: () => [box(0.054, 0.022, 0.18, { p: [0, 0.112, 0.06], c: 0xffffff })],
+  sniper: () => [box(0.076, 0.04, 0.3, { p: [0, 0.06, 0.1], c: 0xffffff }), cyl(0.048, 0.048, 0.025, 10, { r: [HP, 0, 0], p: [0, 0.185, 0.3], c: 0xffffff }), cyl(0.04, 0.04, 0.025, 10, { r: [HP, 0, 0], p: [0, 0.185, -0.03], c: 0xffffff })],
+};
+export const RARMAT = ['#9aa0a6', '#3ecf4a', '#3aa0ff', '#b04dff', '#ffb52e'].map((c) => new THREE.MeshLambertMaterial({ vertexColors: true, color: c, emissive: c, emissiveIntensity: 0.4 }));
 const wcache = {};
-export function weaponGeo(w) { return wcache[w] || (wcache[w] = { main: merge(WDEF[w]()), move: merge(WMOVE[w]()) }); }
-export function weaponModel(w) {
+export function weaponGeo(w) { return wcache[w] || (wcache[w] = { main: merge(WDEF[w]()), move: merge(WMOVE[w]()), acc: merge(WACC[w]()) }); }
+export function weaponModel(w, r) {
   const g = new THREE.Group(), geo = weaponGeo(w);
-  const a = new THREE.Mesh(geo.main, VM), b = new THREE.Mesh(geo.move, VM); a.castShadow = b.castShadow = true; g.add(a, b);
+  const a = new THREE.Mesh(geo.main, VM), b = new THREE.Mesh(geo.move, VM), c = new THREE.Mesh(geo.acc, RARMAT[r | 0]); a.castShadow = b.castShadow = true; g.add(a, b, c);
   return g;
 }
 let pickGeo = null;
@@ -107,6 +116,7 @@ export function itemGeo(i) {
   if (i.k === 'c') {
     if (i.c === 'med') l = [box(0.46, 0.3, 0.3, { p: [0, 0.15, 0], c: 0xe23b2e }), box(0.2, 0.06, 0.02, { p: [0, 0.16, 0.155], c: 0xffffff }), box(0.06, 0.2, 0.02, { p: [0, 0.16, 0.155], c: 0xffffff }), box(0.2, 0.03, 0.06, { p: [0, 0.33, 0], c: 0xf2f2f2 })];
     else if (i.c === 'band') l = [cyl(0.16, 0.16, 0.2, 14, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0xf4f1e6 }), cyl(0.165, 0.165, 0.05, 14, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0xe23b2e }), cyl(0.05, 0.05, 0.21, 8, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0x9a8f7a })];
+    else if (i.c === 'gren') l = [sph(0.15, { s: [1, 1.15, 1], p: [0, 0.18, 0], c: 0x4f6b2f }, 10, 8), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.18, 0], c: 0x3a4f22 }), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.26, 0], c: 0x3a4f22 }), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.1, 0], c: 0x3a4f22 }), cyl(0.05, 0.05, 0.08, 8, { p: [0, 0.38, 0], c: 0x9aa3ad }), box(0.03, 0.2, 0.05, { r: [0, 0, -0.35], p: [0.09, 0.33, 0], c: 0x9aa3ad }), cyl(0.045, 0.045, 0.012, 8, { r: [HP, 0, 0], p: [-0.07, 0.4, 0], c: 0xffc83a })];
     else { const s = i.c === 'pot' ? 1 : 0.7, c = i.c === 'pot' ? 0x2f7bff : 0x6fd3ff; l = [cyl(0.16 * s, 0.18 * s, 0.3 * s, 12, { p: [0, 0.15 * s, 0], c }), cone(0.16 * s, 0.14 * s, 12, { p: [0, 0.37 * s, 0], c }), cyl(0.06 * s, 0.06 * s, 0.1 * s, 8, { p: [0, 0.46 * s, 0], c: 0xdfeaf5 }), cyl(0.07 * s, 0.07 * s, 0.05 * s, 8, { p: [0, 0.53 * s, 0], c: 0x8a5a2b })]; }
   } else if (i.k === 'a') {
     const c = { light: 0xd0b24a, medium: 0x5f7d3a, shells: 0xc23b2e, heavy: 0x3a4a6b }[i.a];
@@ -127,44 +137,57 @@ export function chestModel() {
   return { g, lid };
 }
 
-// ================= Figur =================
+// ================= Figur (mit Ellbogen, Knien und beweglichem Kopf) =================
+export const BPGEO = merge([box(0.34, 0.02, 0.44, { p: [0, 0, 0.1], c: 0x8fd0ff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.2], c: 0xffffff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.08], c: 0xffffff }), box(0.03, 0.022, 0.3, { p: [-0.1, 0, 0.1], c: 0xffffff })]);
 export function makeChar(hue, style) {
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
-  const c1 = hsl(hue, 0.72, 0.5), c2 = hsl(hue + 25, 0.42, 0.2), c3 = hsl(hue + 170, 0.85, 0.58);
-  const skin = [0xf0c8a0, 0xd9a577, 0xb07a52, 0x7a4f33][(style >> 2) & 3], dark = 0x22252b;
-  const parts = [
-    cyl(0.31, 0.24, 0.6, 10, { s: [1, 1, 0.66], p: [0, 1.12, 0], c: c1 }), box(0.12, 0.44, 0.03, { p: [0, 1.14, 0.19], c: c3 }),
-    cyl(0.255, 0.255, 0.07, 10, { s: [1, 1, 0.68], p: [0, 0.83, 0], c: dark }), box(0.09, 0.07, 0.03, { p: [0, 0.83, 0.175], c: c3 }),
-    box(0.42, 0.2, 0.26, { p: [0, 0.72, 0], c: c2 }), cyl(0.07, 0.08, 0.1, 8, { p: [0, 1.46, 0], c: skin }),
-    sph(0.2, { s: [1, 1.1, 1], p: [0, 1.66, 0], c: skin }, 14, 10),
-    box(0.05, 0.05, 0.02, { p: [-0.075, 1.68, 0.187], c: dark }), box(0.05, 0.05, 0.02, { p: [0.075, 1.68, 0.187], c: dark }),
-    sph(0.115, { p: [-0.36, 1.38, 0], c: c2 }, 8, 6), sph(0.115, { p: [0.36, 1.38, 0], c: c2 }, 8, 6),
-    box(0.36, 0.42, 0.18, { p: [0, 1.13, -0.27], c: c2 }), box(0.37, 0.1, 0.2, { p: [0, 1.32, -0.27], c: c3 }),
-    cyl(0.08, 0.08, 0.42, 8, { r: [0, 0, HP], p: [0, 1.42, -0.27], c: 0x6b5a3a }),
-  ];
-  const st = style & 3;
-  if (st === 0) parts.push(sph(0.228, { p: [0, 1.68, 0], c: c2 }, 14, 8, 1.75), box(0.3, 0.04, 0.12, { p: [0, 1.72, 0.2], c: c3 }));
-  else if (st === 1) parts.push(sph(0.218, { p: [0, 1.69, 0], c: c1 }, 14, 8, 1.4), box(0.26, 0.03, 0.2, { p: [0, 1.74, 0.25], c: c2 }));
-  else if (st === 2) { const hc = hsl(hue + 40, 0.5, 0.22); parts.push(sph(0.218, { p: [0, 1.68, -0.01], c: hc }, 14, 8, 1.8), cone(0.07, 0.18, 5, { r: [0.5, 0, 0], p: [0, 1.9, 0.08], c: hc }), cone(0.07, 0.16, 5, { r: [0.2, 0, 0.5], p: [-0.08, 1.9, 0], c: hc }), cone(0.07, 0.16, 5, { r: [0.2, 0, -0.5], p: [0.08, 1.9, 0], c: hc })); }
-  else parts.push(sph(0.222, { p: [0, 1.69, 0], c: c3 }, 14, 8, 1.5), sph(0.06, { p: [0, 1.93, 0], c: 0xffffff }, 8, 6), box(0.34, 0.08, 0.06, { p: [0, 1.69, 0.17], c: dark }), box(0.12, 0.05, 0.065, { p: [-0.08, 1.69, 0.172], c: 0x7fd6ff }), box(0.12, 0.05, 0.065, { p: [0.08, 1.69, 0.172], c: 0x7fd6ff }));
-  const body = new THREE.Group(); const bm = mesh(parts); body.add(bm); g.add(body);
-  const armGeo = merge([cyl(0.085, 0.072, 0.56, 8, { p: [0, -0.28, 0], c: c1 }), cyl(0.08, 0.08, 0.06, 8, { p: [0, -0.5, 0], c: c3 }), sph(0.08, { p: [0, -0.6, 0], c: st & 1 ? dark : skin }, 8, 6)]);
-  const legGeo = merge([cyl(0.115, 0.09, 0.56, 8, { p: [0, -0.28, 0], c: c2 }), box(0.14, 0.12, 0.06, { p: [0, -0.3, 0.1], c: c3 }), box(0.19, 0.16, 0.3, { p: [0, -0.64, 0.04], c: dark })]);
-  const limb = (geo, x, y, par) => { const p = new THREE.Group(); p.position.set(x, y, 0); const m = new THREE.Mesh(geo, VM); m.castShadow = true; p.add(m); par.add(p); return p; };
-  const legL = limb(legGeo, -0.13, 0.72, g), legR = limb(legGeo, 0.13, 0.72, g);
-  const armL = limb(armGeo, -0.4, 1.38, body), armR = limb(armGeo, 0.4, 1.38, body);
-  // Waffe in der rechten Hand
-  const gun = new THREE.Group(); gun.rotation.x = HP; gun.position.set(0, -0.6, 0.06);
-  const gunMain = new THREE.Mesh(weaponGeo('ar').main, VM), gunMove = new THREE.Mesh(weaponGeo('ar').move, VM); gunMain.castShadow = true; gun.add(gunMain, gunMove);
-  const flash = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 6).rotateX(HP), new THREE.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: 0.95, fog: false })); flash.visible = false; gun.add(flash);
-  armR.add(gun);
-  const pick = new THREE.Mesh(pickaxeGeo(), VM); pick.castShadow = true; pick.position.set(0, -0.6, 0); armR.add(pick);
+  const c1 = hsl(hue, 0.72, 0.5), c1d = hsl(hue, 0.65, 0.36), c2 = hsl(hue + 25, 0.42, 0.2), c3 = hsl(hue + 170, 0.85, 0.58);
+  const st = style & 3, skin = [0xf0c8a0, 0xd9a577, 0xb07a52, 0x7a4f33][(style >> 2) & 3], dark = 0x22252b;
+  const geos = [];
+  const add = (geo, par) => { const m = new THREE.Mesh(geo, VM); m.castShadow = true; par.add(m); return m; };
+  const G1 = (list) => { const x = merge(list); geos.push(x); return x; };
+  const body = new THREE.Group(); body.position.y = 0.8; g.add(body);
+  add(G1([
+    cyl(0.31, 0.245, 0.6, 10, { s: [1, 1, 0.66], p: [0, 0.32, 0], c: c1 }), box(0.12, 0.44, 0.03, { p: [0, 0.34, 0.192], c: c3 }),
+    box(0.16, 0.12, 0.03, { p: [-0.16, 0.2, 0.185], c: c1d }), box(0.16, 0.12, 0.03, { p: [0.16, 0.2, 0.185], c: c1d }),
+    box(0.06, 0.62, 0.03, { r: [0, 0, 0.55], p: [0, 0.34, 0.2], c: dark }),
+    cyl(0.262, 0.262, 0.07, 10, { s: [1, 1, 0.68], p: [0, 0.03, 0], c: dark }), box(0.09, 0.07, 0.03, { p: [0, 0.03, 0.18], c: c3 }),
+    box(0.1, 0.12, 0.08, { p: [0.24, -0.02, 0.06], c: 0x6b5a3a }), box(0.42, 0.2, 0.26, { p: [0, -0.08, 0], c: c2 }),
+    cyl(0.07, 0.08, 0.1, 8, { p: [0, 0.66, 0], c: skin }), cyl(0.12, 0.14, 0.06, 8, { s: [1, 1, 0.8], p: [0, 0.62, 0], c: c1d }),
+    box(0.36, 0.42, 0.18, { p: [0, 0.33, -0.27], c: c2 }), box(0.37, 0.1, 0.2, { p: [0, 0.52, -0.27], c: c3 }), box(0.2, 0.16, 0.05, { p: [0, 0.26, -0.37], c: c1d }),
+    cyl(0.08, 0.08, 0.42, 8, { r: [0, 0, HP], p: [0, 0.62, -0.27], c: 0x6b5a3a }),
+  ]), body);
+  const head = new THREE.Group(); head.position.y = 0.68; body.add(head);
+  const hp = [sph(0.2, { s: [1, 1.1, 1], p: [0, 0.19, 0], c: skin }, 14, 10),
+    box(0.05, 0.05, 0.02, { p: [-0.075, 0.21, 0.187], c: dark }), box(0.05, 0.05, 0.02, { p: [0.075, 0.21, 0.187], c: dark }),
+    box(0.07, 0.016, 0.02, { r: [0, 0, -0.12], p: [-0.075, 0.255, 0.188], c: dark }), box(0.07, 0.016, 0.02, { r: [0, 0, 0.12], p: [0.075, 0.255, 0.188], c: dark }),
+    box(0.04, 0.05, 0.04, { p: [0, 0.165, 0.2], c: skin }), box(0.08, 0.016, 0.02, { p: [0, 0.1, 0.186], c: 0x8a3b3b }),
+    box(0.03, 0.07, 0.05, { p: [-0.2, 0.19, 0], c: skin }), box(0.03, 0.07, 0.05, { p: [0.2, 0.19, 0], c: skin })];
+  if (st === 0) hp.push(sph(0.228, { p: [0, 0.21, 0], c: c2 }, 14, 8, 1.75), box(0.3, 0.04, 0.12, { p: [0, 0.25, 0.2], c: c3 }), box(0.06, 0.03, 0.3, { p: [0, 0.43, 0], c: c3 }));
+  else if (st === 1) hp.push(sph(0.218, { p: [0, 0.22, 0], c: c1 }, 14, 8, 1.4), box(0.26, 0.03, 0.2, { p: [0, 0.27, 0.25], c: c2 }), sph(0.03, { p: [0, 0.44, 0], c: c3 }, 6, 4));
+  else if (st === 2) { const hc = hsl(hue + 40, 0.5, 0.22); hp.push(sph(0.218, { p: [0, 0.21, -0.01], c: hc }, 14, 8, 1.8), cone(0.07, 0.18, 5, { r: [0.5, 0, 0], p: [0, 0.43, 0.08], c: hc }), cone(0.07, 0.16, 5, { r: [0.2, 0, 0.5], p: [-0.08, 0.43, 0], c: hc }), cone(0.07, 0.16, 5, { r: [0.2, 0, -0.5], p: [0.08, 0.43, 0], c: hc }), cone(0.06, 0.14, 5, { r: [-0.4, 0, 0], p: [0, 0.42, -0.08], c: hc })); }
+  else hp.push(sph(0.222, { p: [0, 0.22, 0], c: c3 }, 14, 8, 1.5), sph(0.06, { p: [0, 0.46, 0], c: 0xffffff }, 8, 6), cyl(0.225, 0.225, 0.05, 14, { p: [0, 0.2, 0], c: 0xffffff }), box(0.34, 0.08, 0.06, { p: [0, 0.22, 0.17], c: dark }), box(0.12, 0.05, 0.065, { p: [-0.08, 0.22, 0.172], c: 0x7fd6ff }), box(0.12, 0.05, 0.065, { p: [0.08, 0.22, 0.172], c: 0x7fd6ff }));
+  add(G1(hp), head);
+  const aUp = G1([sph(0.115, { c: c2 }, 8, 6), cyl(0.088, 0.078, 0.32, 8, { p: [0, -0.16, 0], c: c1 })]);
+  const aLow = G1([sph(0.08, { c: c1 }, 8, 6), cyl(0.076, 0.066, 0.28, 8, { p: [0, -0.14, 0], c: c1 }), cyl(0.078, 0.078, 0.06, 8, { p: [0, -0.25, 0], c: c3 }), box(0.1, 0.11, 0.11, { p: [0, -0.33, 0], c: st & 1 ? dark : skin })]);
+  const lUp = G1([cyl(0.12, 0.1, 0.4, 8, { p: [0, -0.2, 0], c: c2 }), box(0.08, 0.14, 0.04, { p: [0.1, -0.16, 0], c: c1d })]);
+  const lLow = G1([sph(0.1, { c: c2 }, 8, 6), cyl(0.095, 0.085, 0.34, 8, { p: [0, -0.17, 0], c: c2 }), box(0.14, 0.12, 0.06, { p: [0, -0.03, 0.09], c: c3 }), cyl(0.1, 0.1, 0.08, 8, { p: [0, -0.3, 0], c: dark }), box(0.19, 0.14, 0.3, { p: [0, -0.37, 0.05], c: dark }), box(0.2, 0.04, 0.32, { p: [0, -0.43, 0.05], c: 0x111317 })]);
+  const limb = (gu, gl, x, y, len, par) => { const up = new THREE.Group(); up.position.set(x, y, 0); add(gu, up); const low = new THREE.Group(); low.position.y = -len; add(gl, low); up.add(low); par.add(up); return { up, low }; };
+  const aL = limb(aUp, aLow, -0.4, 0.58, 0.3, body), aR = limb(aUp, aLow, 0.4, 0.58, 0.3, body);
+  const lL = limb(lUp, lLow, -0.13, 0.78, 0.38, g), lR = limb(lUp, lLow, 0.13, 0.78, 0.38, g);
+  const gun = new THREE.Group(); gun.rotation.x = HP; gun.position.set(0, -0.33, 0.07);
+  const wg = weaponGeo('ar');
+  const gunMain = add(wg.main, gun), gunMove = add(wg.move, gun), gunAcc = new THREE.Mesh(wg.acc, RARMAT[0]); gun.add(gunAcc);
+  const flash = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 6).rotateX(HP), new THREE.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: 0.95, fog: false })); flash.visible = false; gun.add(flash);
+  aR.low.add(gun);
+  const pick = add(pickaxeGeo(), aR.low); pick.position.set(0, -0.33, 0);
+  const held = add(BPGEO, aR.low); held.position.set(0, -0.42, 0.06); held.visible = false;
   const glider = new THREE.Group();
   const canopy = [];
-  for (let i = -2; i <= 2; i++) canopy.push(box(0.66, 0.08, 1.6, { r: [0, 0, -i * 0.16], p: [i * 0.64, 3.2 - Math.abs(i) * Math.abs(i) * 0.055, 0], c: i % 2 ? 0xffffff : c1 }));
-  canopy.push(cyl(0.02, 0.02, 1.5, 5, { r: [0, 0, 0.42], p: [-0.5, 2.5, 0], c: dark }), cyl(0.02, 0.02, 1.5, 5, { r: [0, 0, -0.42], p: [0.5, 2.5, 0], c: dark }), box(1.0, 0.05, 0.05, { p: [0, 1.95, 0], c: dark }));
-  glider.add(mesh(canopy)); glider.visible = false; g.add(glider);
-  return { g, body, legL, legR, armL, armR, gun, gunMain, gunMove, flash, pick, glider, walk: 0, w: 'ar', kick: 0, draw: 1, geos: [bm.geometry, armGeo, legGeo, glider.children[0].geometry] };
+  for (let i = -3; i <= 3; i++) canopy.push(box(0.6, 0.07, 1.7 - Math.abs(i) * 0.12, { r: [0, 0, -i * 0.15], p: [i * 0.57, 3.25 - i * i * 0.05, 0], c: i % 2 ? 0xffffff : c1 }));
+  canopy.push(cyl(0.02, 0.02, 1.6, 5, { r: [0, 0, 0.5], p: [-0.55, 2.55, 0], c: dark }), cyl(0.02, 0.02, 1.6, 5, { r: [0, 0, -0.5], p: [0.55, 2.55, 0], c: dark }), cyl(0.02, 0.02, 1.9, 5, { r: [0, 0, 0.95], p: [-1.0, 2.6, 0], c: dark }), cyl(0.02, 0.02, 1.9, 5, { r: [0, 0, -0.95], p: [1.0, 2.6, 0], c: dark }), box(1.0, 0.05, 0.05, { p: [0, 1.95, 0], c: dark }));
+  add(G1(canopy), glider); glider.visible = false; g.add(glider);
+  return { g, body, head, aL, aR, lL, lR, gun, gunMain, gunMove, gunAcc, flash, pick, held, glider, geos, walk: 0, w: '', wr: -1, kick: 0, draw: 1, flinch: 0, land: 0, cur: null };
 }
 export function disposeChar(ch) { for (const g of ch.geos) g.dispose(); }
 
@@ -219,9 +242,34 @@ export function natureGeos() {
     rock: merge([mk(new THREE.DodecahedronGeometry(1.3), { s: [1, 0.75, 1.1], p: [0, 0.45, 0], c: 0x8d8f94, flat: 1 }), mk(new THREE.DodecahedronGeometry(0.7), { r: [0.4, 0.7, 0], p: [0.95, 0.25, 0.5], c: 0x76787d, flat: 1 }), mk(new THREE.DodecahedronGeometry(0.5), { r: [0.2, 0.3, 0.6], p: [-0.8, 0.2, -0.6], c: 0x9c9ea3, flat: 1 })]),
     bush: merge([ico(0.7, 0, { s: [1.2, 0.75, 1.2], p: [0, 0.38, 0], c: 0x3f8f3a, flat: 1 }), ico(0.5, 0, { p: [0.55, 0.3, 0.2], c: 0x4fa246, flat: 1 }), ico(0.4, 0, { p: [-0.5, 0.25, -0.25], c: 0x357a31, flat: 1 })]),
     grass: merge([cone(0.07, 0.55, 4, { r: [0.15, 0, 0.1], p: [0, 0.27, 0], c: 0x6fc24a, flat: 1 }), cone(0.06, 0.45, 4, { r: [-0.2, 0, -0.3], p: [0.12, 0.22, 0.05], c: 0x5fae3c, flat: 1 }), cone(0.06, 0.4, 4, { r: [0.25, 0, 0.35], p: [-0.1, 0.2, -0.06], c: 0x7fce58, flat: 1 })]),
+    birch: merge([cyl(0.16, 0.24, 4.2, 6, { p: [0, 2.1, 0], c: 0xe9e5d8, flat: 1 }), box(0.3, 0.08, 0.3, { p: [0, 1.0, 0], c: 0x3a3a36 }), box(0.26, 0.07, 0.26, { p: [0, 2.1, 0], c: 0x3a3a36 }), box(0.22, 0.06, 0.22, { p: [0, 3.0, 0], c: 0x3a3a36 }),
+      ico(1.25, 1, { s: [1, 1.25, 1], p: [0, 5.0, 0], c: 0x9fcf4a, flat: 1 }), ico(0.95, 1, { p: [0.8, 4.2, 0.3], c: 0xb5dc5a, flat: 1 }), ico(0.9, 1, { p: [-0.7, 4.4, -0.4], c: 0x8cc040, flat: 1 })]),
+    palm: merge([cyl(0.2, 0.3, 1.6, 6, { r: [0, 0, 0.1], p: [0, 0.8, 0], c: 0x9a7b4f, flat: 1 }), cyl(0.18, 0.21, 1.6, 6, { r: [0, 0, 0.2], p: [-0.24, 2.3, 0], c: 0x8a6c42, flat: 1 }), cyl(0.15, 0.19, 1.6, 6, { r: [0, 0, 0.3], p: [-0.62, 3.75, 0], c: 0x9a7b4f, flat: 1 }), cyl(0.13, 0.16, 1.4, 6, { r: [0, 0, 0.38], p: [-1.1, 5.1, 0], c: 0x8a6c42, flat: 1 }),
+      sph(0.18, { p: [-1.25, 5.6, 0.2], c: 0x5a3a1a }, 6, 5), sph(0.18, { p: [-1.5, 5.6, -0.15], c: 0x5a3a1a }, 6, 5),
+      ...[0, 1, 2, 3, 4, 5, 6].map((i) => { const a = i * 0.898; return box(0.55, 0.05, 2.6, { r: [0.55, a, 0], p: [-1.36 + Math.sin(a) * 1.1, 5.55, Math.cos(a) * 1.1], c: i % 2 ? 0x3f9a3a : 0x4fae46, flat: 1 }); })]),
+    crate: merge([box(1.2, 1.2, 1.2, { p: [0, 0.6, 0], c: 0xb9824a }), ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([a, b]) => box(0.14, 1.24, 0.14, { p: [a * 0.56, 0.6, b * 0.56], c: 0x7d5226 })), box(1.24, 0.14, 1.24, { p: [0, 0.07, 0], c: 0x7d5226 }), box(1.24, 0.14, 1.24, { p: [0, 1.13, 0], c: 0x7d5226 }), box(1.22, 0.1, 0.1, { r: [0, 0, 0.78], p: [0, 0.6, 0.6], c: 0x8a5a2b }), box(1.22, 0.1, 0.1, { r: [0, 0, 0.78], p: [0, 0.6, -0.6], c: 0x8a5a2b })]),
+    barrel: merge([cyl(0.48, 0.48, 1.2, 12, { p: [0, 0.6, 0], c: 0x3f6f9a }), cyl(0.5, 0.5, 0.07, 12, { p: [0, 0.2, 0], c: 0x9aa3ad }), cyl(0.5, 0.5, 0.07, 12, { p: [0, 0.6, 0], c: 0x9aa3ad }), cyl(0.5, 0.5, 0.07, 12, { p: [0, 1.0, 0], c: 0x9aa3ad }), cyl(0.44, 0.44, 0.04, 12, { p: [0, 1.21, 0], c: 0x2f5578 }), cyl(0.06, 0.06, 0.06, 6, { p: [0.25, 1.24, 0], c: 0x22252b })]),
     flower: merge([cyl(0.015, 0.015, 0.4, 4, { p: [0, 0.2, 0], c: 0x4c9632 }), sph(0.09, { s: [1, 0.6, 1], p: [0, 0.42, 0], c: 0xffffff }, 6, 4)]),
   };
 }
+
+export function houseDeco(h, G, H) {
+  const [cx, cz, w, d, l, st, door, mt] = h;
+  const x0 = cx * G, z0 = cz * G, x1 = (cx + w) * G, z1 = (cz + d) * G, mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, y0 = l * H, top = (l + st) * H + 0.12;
+  const trim = mt === 'w' ? 0x6f4a22 : mt === 's' ? 0xd8d4c8 : 0x3f5062, floor = mt === 'w' ? 0xa87238 : mt === 's' ? 0x8f8f8a : 0x56687a;
+  const aw = [0xd0392e, 0x2f7bd0, 0x3a9a4a, 0xe0a92e][(cx * 7 + cz * 13 & 0x7fffffff) % 4], dx = (cx + door + 0.5) * G;
+  const l2 = [
+    box(x1 - x0 + 0.6, 0.12, z1 - z0 + 0.6, { p: [mx, y0 + 0.01, mz], c: floor }),
+    box(x1 - x0 + 0.5, 0.45, 0.3, { p: [mx, top + 0.2, z0], c: trim }), box(x1 - x0 + 0.5, 0.45, 0.3, { p: [mx, top + 0.2, z1], c: trim }),
+    box(0.3, 0.45, z1 - z0 + 0.5, { p: [x0, top + 0.2, mz], c: trim }), box(0.3, 0.45, z1 - z0 + 0.5, { p: [x1, top + 0.2, mz], c: trim }),
+    box(0.3, 0.3, 0.34, { p: [dx - G / 2 + 0.1, y0 + H / 2, z0], s: [1, H / 0.3, 1], c: trim }), box(0.3, 0.3, 0.34, { p: [dx + G / 2 - 0.1, y0 + H / 2, z0], s: [1, H / 0.3, 1], c: trim }),
+    box(G, 0.3, 0.34, { p: [dx, y0 + H - 0.15, z0], c: trim }), box(G + 0.5, 0.08, 1.3, { r: [-0.28, 0, 0], p: [dx, y0 + H + 0.12, z0 - 0.62], c: aw }),
+    box(0.7, 1.3, 0.7, { p: [x1 - 0.85, top + 0.65, z1 - 0.85], c: 0x8a5a4a }), box(0.86, 0.14, 0.86, { p: [x1 - 0.85, top + 1.3, z1 - 0.85], c: 0x4a3a34 }),
+  ];
+  for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) l2.push(box(0.42, 1, 0.42, { s: [1, st * H + 0.5, 1], p: [px, y0 + (st * H + 0.5) / 2, pz], c: trim }));
+  return merge(l2);
+}
+export const streakGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5);
 
 // ================= Himmel / Wolken =================
 export function makeSky(sunDir) {
@@ -251,15 +299,15 @@ export class Particles {
     for (let i = 0; i < n; i++) this.im.setColorAt(i, _c.set(0xffffff));
     scene.add(this.im);
   }
-  burst(x, y, z, color, n, speed = 4, size = 0.09, life = 0.6, grav = 12) {
+  burst(x, y, z, color, n, speed = 4, size = 0.09, life = 0.6, grav = 12, bounce = false) {
     for (let i = 0; i < n && this.list.length < this.n; i++) {
       const a = Math.random() * 6.283, u = Math.random() * 2 - 1, q = Math.sqrt(1 - u * u), sp = speed * (0.4 + Math.random() * 0.8);
-      this.list.push({ x, y, z, vx: Math.cos(a) * q * sp, vy: u * sp + speed * 0.4, vz: Math.sin(a) * q * sp, t: life * (0.6 + Math.random() * 0.6), l: life, s: size * (0.6 + Math.random() * 0.8), c: color, g: grav });
+      this.list.push({ x, y, z, vx: Math.cos(a) * q * sp, vy: u * sp + speed * 0.4, vz: Math.sin(a) * q * sp, t: life * (0.6 + Math.random() * 0.6), l: life, s: size * (0.6 + Math.random() * 0.8), c: color, g: grav, b: bounce });
     }
   }
   update(dt) {
     const L = this.list, d = this.d;
-    for (let i = L.length - 1; i >= 0; i--) { const p = L[i]; p.t -= dt; if (p.t <= 0) { L[i] = L[L.length - 1]; L.pop(); continue; } p.vy -= p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; }
+    for (let i = L.length - 1; i >= 0; i--) { const p = L[i]; p.t -= dt; if (p.t <= 0) { L[i] = L[L.length - 1]; L.pop(); continue; } p.vy -= p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; if (p.b && this.ground) { const gh = this.ground(p.x, p.z) + p.s * 0.5; if (p.y < gh) { p.y = gh; p.vy = -p.vy * 0.4; p.vx *= 0.6; p.vz *= 0.6; } } }
     for (let i = 0; i < L.length; i++) { const p = L[i]; d.position.set(p.x, p.y, p.z); d.scale.setScalar(p.s * Math.min(1, p.t / p.l * 2)); d.rotation.set(p.t * 5, p.t * 3, 0); d.updateMatrix(); this.im.setMatrixAt(i, d.matrix); this.im.setColorAt(i, _c.set(p.c)); }
     this.im.count = L.length; this.im.instanceMatrix.needsUpdate = true; if (this.im.instanceColor) this.im.instanceColor.needsUpdate = true;
   }
