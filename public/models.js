@@ -302,7 +302,7 @@ export function makeSky(sunDir) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(1300, 24, 14), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { sun: { value: sunDir } },
     vertexShader: 'varying vec3 vp; void main(){ vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'varying vec3 vp; uniform vec3 sun; void main(){ vec3 d=normalize(vp); float h=max(d.y,0.0); vec3 c=mix(vec3(0.52,0.74,0.95),vec3(0.07,0.25,0.68),pow(h,0.6)); float s=max(dot(d,sun),0.0); c+=vec3(1.0,0.85,0.55)*pow(s,350.0)*2.0+vec3(1.0,0.75,0.45)*pow(s,10.0)*0.18; gl_FragColor=vec4(c,1.0);\n#include <colorspace_fragment>\n}',
+    fragmentShader: 'varying vec3 vp; uniform vec3 sun; void main(){ vec3 d=normalize(vp); float h=max(d.y,0.0); vec3 c=mix(vec3(0.52,0.74,0.95),vec3(0.07,0.25,0.68),pow(h,0.6)); float s=max(dot(d,sun),0.0); c+=vec3(1.0,0.85,0.55)*pow(s,350.0)*2.0+vec3(1.0,0.75,0.45)*pow(s,10.0)*0.18; gl_FragColor=vec4(c,1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
   }));
   m.renderOrder = -10; m.frustumCulled = false;
   return m;

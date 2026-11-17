@@ -139,13 +139,30 @@ body.driving #prompt{top:auto;bottom:170px}
 #scope:before,#scope:after{content:"";position:absolute;background:#000}
 #scope:before{left:50%;top:0;bottom:0;width:1px}#scope:after{top:50%;left:0;right:0;height:1px}
 #bigmap{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:15;border:4px solid #fff;border-radius:14px;display:none;max-height:86vh;max-width:86vh;width:86vh;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-#lock{pointer-events:none;position:fixed;left:50%;bottom:130px;transform:translateX(-50%);z-index:12;background:var(--glass);padding:10px 22px;border-radius:10px;font-weight:800;font-size:17px;display:none;border:1px solid rgba(255,255,255,.2)}
+#lock{pointer-events:none;position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:12;background:var(--glass);padding:10px 22px;border-radius:10px;font-weight:800;font-size:17px;display:none;border:1px solid rgba(255,255,255,.2)}
 .dn{position:fixed;z-index:11;font:900 24px var(--f);font-style:italic;pointer-events:none;text-shadow:0 2px 0 #000,0 0 5px #000;transition:transform .7s ease-out,opacity .7s}
+#useL{position:absolute;left:50%;top:calc(69% - 24px);transform:translateX(-50%);font-weight:800;font-size:14px;text-shadow:0 2px 3px #000;display:none;white-space:nowrap}
+.modes{display:flex;gap:8px;justify-content:center;margin-top:12px}
+.modes button{font:900 16px var(--f);font-style:italic;letter-spacing:2px;padding:8px 26px;border-radius:8px;border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);color:#fff;cursor:pointer;transform:skewX(-6deg)}
+.modes button.sel{background:var(--y);color:#111;border-color:var(--y);box-shadow:0 0 16px rgba(255,216,58,.5)}
+.lobbym{pointer-events:auto;margin-top:16px}
+#lobbyV{margin-top:10px;font-weight:800;font-size:16px;letter-spacing:1px;opacity:.95}
+#team{position:absolute;left:18px;top:44%;width:210px;background:var(--glass);border:1px solid rgba(255,255,255,.18);border-left:4px solid #59b7ff;border-radius:8px;padding:6px 10px 8px;display:none}
+#team .tn{display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:14px;margin-bottom:4px}
+#team .tn small{font-size:11px;opacity:.8}
+#team .tb1,#team .tb2{height:7px;background:rgba(0,0,0,.5);border-radius:3px;overflow:hidden;margin-top:3px}
+#team .tb1 i,#team .tb2 i{display:block;height:100%;transition:width .2s}
+#team .tb1 i{background:#47d64a}#team .tb2 i{background:#33a8ff}
+#team.down{border-left-color:#ff5a4d;animation:blink 1s infinite}#team.down .tb1 i{background:#ff5a4d}
+#team.dead{opacity:.5;border-left-color:#777}
+#tag{position:absolute;left:0;top:0;margin:-12px 0 0 -60px;width:120px;text-align:center;font-weight:800;font-size:12px;color:#bfe4ff;text-shadow:0 1px 2px #000,0 0 4px #000;display:none;white-space:nowrap;will-change:transform}
+#tag:after{content:"";display:block;width:0;height:0;margin:2px auto 0;border:6px solid transparent;border-top-color:#59b7ff}
+#tag.down{color:#ffb3ad}#tag.down:after{border-top-color:#ff5a4d}
 #touch{position:fixed;inset:0;z-index:9;display:none;touch-action:none}
 body.touch #touch{display:block}
-.tb{position:absolute;display:none;align-items:center;justify-content:center;border-radius:50%;background:rgba(10,16,30,.45);border:2px solid rgba(255,255,255,.75);font:900 11px var(--f);letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px #000;touch-action:none}
+.tb{pointer-events:none;position:absolute;display:none;align-items:center;justify-content:center;border-radius:50%;background:rgba(10,16,30,.45);border:2px solid rgba(255,255,255,.75);font:900 11px var(--f);letter-spacing:.5px;color:#fff;text-shadow:0 1px 2px #000;touch-action:none}
 body.touch.ingame .tb{display:flex}
-body.touch.driving .tb{display:none}
+body.touch.driving .tb,body.touch.down .tb{display:none}
 .tb.on{background:rgba(255,255,255,.4)}.tb.act{background:rgba(255,216,58,.55);border-color:var(--y)}
 #bFire{right:calc(26px + env(safe-area-inset-right));bottom:74px;width:86px;height:86px;font-size:14px;background:rgba(220,50,40,.5)}
 #bFire2{left:calc(18px + env(safe-area-inset-left));top:27%;width:60px;height:60px;background:rgba(220,50,40,.4)}
@@ -153,11 +170,15 @@ body.touch.driving .tb{display:none}
 #bAds{right:calc(30px + env(safe-area-inset-right));bottom:176px;width:58px;height:58px}
 #bRel{right:calc(104px + env(safe-area-inset-right));bottom:148px;width:52px;height:52px}
 #bCrouch{right:calc(196px + env(safe-area-inset-right));bottom:70px;width:52px;height:52px}
+
 #stick{position:absolute;display:none;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.5);pointer-events:none}
 #knob{position:absolute;left:36px;top:36px;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.6)}
 #rotate{background:#141a3a;z-index:40;font-weight:800;font-size:22px;padding:30px}
 @media (orientation:portrait){body.touch #rotate{display:flex}}
 body.touch details{display:none}body.touch #menu{padding-left:3vw}body.touch .cust{margin-top:6px;gap:5px}body.touch .cust button{padding:4px 6px}
+body.touch #spec{bottom:auto;top:46px;font-size:11px;padding:4px 12px}body.touch #ammo{right:auto;left:50%;transform:translateX(-50%);bottom:97px;display:flex;gap:8px;align-items:baseline;white-space:nowrap;font-size:17px}body.touch #wname{font-size:10px}
+#bEmote{right:calc(170px + env(safe-area-inset-right));top:56px;width:44px;height:44px;font-size:10px}
+body.touch #team{left:calc(10px + env(safe-area-inset-left));top:46%;width:150px;padding:4px 8px 6px}body.touch #team .tn{font-size:11px}body.touch .modes button{font-size:13px;padding:5px 18px}body.touch #useL{top:calc(60% - 22px);font-size:12px}body.touch #lobbyV{font-size:12px}
 body.touch #storm{top:158px;right:calc(8px + env(safe-area-inset-right));width:150px;font-size:10px;padding:4px 7px}body.touch #picks{top:36%;font-size:10px}body.touch #spec{bottom:70px;font-size:12px}body.touch .chips span{font-size:11px;padding:5px 10px}body.touch .chips span b{font-size:17px}body.touch #lowammo{font-size:12px}
 body.touch .keys{display:none}body.touch .thint{display:block;font-weight:600;font-size:12px;line-height:1.6;margin-top:10px;opacity:.9;max-width:520px}
 body.touch .logo{font-size:40px}body.touch .sub{margin:4px 0 8px;font-size:10px}
@@ -178,7 +199,7 @@ body.touch .slot .k{display:none}body.touch .slot .a{font-size:11px;right:5px;bo
 body.touch #build{right:auto;left:50%;transform:translateX(-50%);bottom:62px;gap:4px;font-size:10px;pointer-events:auto;white-space:nowrap}
 body.touch .bs{padding:6px 8px}body.touch .bs svg{width:20px;height:11px}body.touch .bs img{height:20px}body.touch .mat img{height:16px}body.touch .mat{padding:6px 6px;font-size:11px}
 body.touch #ammo{right:calc(128px + env(safe-area-inset-right));bottom:136px;font-size:18px}body.touch #ammo small{font-size:11px}
-body.touch #prompt{top:auto;bottom:116px;font-size:14px;padding:10px 14px;pointer-events:auto;border:2px solid var(--y)}
+body.touch #prompt{top:auto;bottom:130px;font-size:14px;padding:10px 14px;pointer-events:auto;border:2px solid var(--y)}
 body.touch #use{top:60%}body.touch #gain{font-size:14px}body.touch #speed{bottom:150px;font-size:20px}
 body.touch #lock{display:none!important}
 body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
@@ -193,10 +214,11 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
   <canvas id="mini" width="200" height="200"></canvas>
   <div id="info"></div>
   <div id="storm"><div id="stormBar"><i></i></div><span id="stormTxt"></span><span id="zone"></span></div>
+  <div id="team"></div><div id="tag"></div>
   <div id="picks"></div><div id="spec"></div><div id="lowammo"></div>
   <div id="banner"></div><div id="elim"></div>
   <div id="cross"><i></i><i></i><i></i><i></i><i></i></div><div id="hitm"><i></i><i></i><i></i><i></i></div><div id="hurtdir"><i></i></div>
-  <div id="prompt"></div><div id="use"><i></i></div><div id="gain"></div><div id="speed"></div>
+  <div id="prompt"></div><div id="useL"></div><div id="use"><i></i></div><div id="gain"></div><div id="speed"></div>
   <div id="bars">
     <div class="bar" id="shb"><svg viewBox="0 0 24 24"><path fill="#4db8ff" d="M12 2l8 3v6c0 5-3.4 9.3-8 11-4.6-1.7-8-6-8-11V5z"/></svg><div class="tr"><i class="lag"></i><i></i></div><b></b></div>
     <div class="bar" id="hpb"><svg viewBox="0 0 24 24"><path fill="#5be05a" d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg><div class="tr"><i class="lag"></i><i></i></div><b></b></div>
@@ -213,6 +235,7 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
   <div class="tb" id="bAds">ZIELEN</div>
   <div class="tb" id="bRel">LADEN</div>
   <div class="tb" id="bCrouch">DUCKEN</div>
+  <div class="tb" id="bEmote">TANZ</div>
 </div>
 <canvas id="bigmap" width="700" height="700"></canvas>
 <div id="score"></div>
@@ -223,6 +246,7 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
     <div class="sub">Battle Royale · Bauen · Looten · Fahren</div>
     <div class="card">
       <input id="name" maxlength="14" placeholder="Dein Name" autocomplete="off">
+      <div class="modes"><button data-mode="solo">SOLO</button><button data-mode="duo">DUO</button></div>
       <div class="cust">
         <div><button data-c="out-">◀</button><span>Outfit</span><button data-c="out+">▶</button></div>
         <div><button data-c="head-">◀</button><span id="cHead">Helm</span><button data-c="head+">▶</button></div>
@@ -236,14 +260,14 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
         <div><b>Strg</b>Ducken · <b>B</b>Tanzen</div><div><b>Linksklick</b>Schießen / Werfen / Bauen</div>
         <div><b>Rechtsklick</b>Zielen / Material</div><div><b>1–6</b><b>Mausrad</b>Inventar</div>
         <div><b>Q</b>Wand <b>F</b>Boden <b>C</b>Rampe</div><div><b>E</b>Aufheben / Truhe / Auto</div>
-        <div><b>R</b>Nachladen · <b>M</b>Karte</div><div><b>Tab</b>Spielerliste</div>
+        <div><b>R</b>Nachladen · <b>M</b>Karte · <b>G</b>Markieren</div><div><b>Tab</b>Spielerliste · <b>E halten</b>Wiederbeleben</div>
       </div></details>
       <div class="thint">Links wischen: Laufen / Fahren · Rechts wischen: Umsehen · FEUER: Schießen, Werfen, Abbauen, Bauen · Auto-Feuer, wenn das Fadenkreuz auf einem Gegner liegt · Inventar, Bauteile, Karte und Hinweise antippen</div>
     </div>
   </div>
 </div>
 <div class="ov" id="rotate">📱↻<br>Bitte das Gerät quer drehen</div>
-<div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyN"></div></div>
+<div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyV"></div><div class="modes lobbym"><button data-mode="solo">SOLO</button><button data-mode="duo">DUO</button></div><div id="lobbyN"></div></div>
 <div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div></div>
 <div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div></div>
 <script src="shared.js"></script>

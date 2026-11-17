@@ -80,11 +80,12 @@
     return best;
   };
   S.STORM = [
-    { wait: 75, shrink: 40, f: 0.5, dmg: 1 },
-    { wait: 40, shrink: 30, f: 0.27, dmg: 2 },
-    { wait: 30, shrink: 25, f: 0.12, dmg: 4 },
-    { wait: 20, shrink: 20, f: 0.04, dmg: 7 },
-    { wait: 10, shrink: 20, f: 0, dmg: 10 },
+    { wait: 80, shrink: 45, f: 0.55, dmg: 1 },
+    { wait: 45, shrink: 35, f: 0.32, dmg: 2 },
+    { wait: 35, shrink: 28, f: 0.17, dmg: 4 },
+    { wait: 25, shrink: 22, f: 0.08, dmg: 6 },
+    { wait: 15, shrink: 18, f: 0.025, dmg: 8 },
+    { wait: 10, shrink: 18, f: 0, dmg: 10 },
   ];
 
   // Bauteile: t = 'w' Wand (d: 0 entlang x, 1 entlang z), 'f' Boden, 'r' Rampe (rot 0..3)
@@ -116,31 +117,51 @@
     }
     return t0;
   };
-  S.rayPieces = function (ox, oy, oz, dx, dy, dz, max, pieces) {
-    let best = max, key = null;
-    for (const p of pieces.values()) {
-      const cx = (p.ix + 0.5) * G - ox, cz = (p.iz + 0.5) * G - oz, lim = best + 5;
-      if (cx * cx + cz * cz > lim * lim) continue;
-      let t = null;
-      if (p.t === 'r') {
-        const k = H / G; let a, b = 0, c = 0;
-        if (p.rot === 0) { c = k; a = p.iy * H - p.iz * G * c; }
-        else if (p.rot === 1) { b = k; a = p.iy * H - p.ix * G * b; }
-        else if (p.rot === 2) { c = -k; a = p.iy * H + H - p.iz * G * c; }
-        else { b = -k; a = p.iy * H + H - p.ix * G * b; }
-        const den = dy - b * dx - c * dz;
-        if (Math.abs(den) > 1e-9) {
-          const tt = (a + b * ox + c * oz - oy) / den;
-          if (tt > 0) {
-            const hx = ox + dx * tt, hz = oz + dz * tt;
-            if (hx >= p.ix * G && hx <= p.ix * G + G && hz >= p.iz * G && hz <= p.iz * G + G) t = tt;
-          }
-        }
-      } else t = S.rayBox(ox, oy, oz, dx, dy, dz, S.pbox(p));
-      if (t !== null && t < best) { best = t; key = p.key; }
-    }
-    return key ? { t: best, key } : null;
+  S.rayPiece = function (p, ox, oy, oz, dx, dy, dz) {
+    if (p.t !== 'r') return S.rayBox(ox, oy, oz, dx, dy, dz, S.pbox(p));
+    const k = H / G; let a, b = 0, c = 0;
+    if (p.rot === 0) { c = k; a = p.iy * H - p.iz * G * c; }
+    else if (p.rot === 1) { b = k; a = p.iy * H - p.ix * G * b; }
+    else if (p.rot === 2) { c = -k; a = p.iy * H + H - p.iz * G * c; }
+    else { b = -k; a = p.iy * H + H - p.ix * G * b; }
+    const den = dy - b * dx - c * dz;
+    if (Math.abs(den) < 1e-9) return null;
+    const tt = (a + b * ox + c * oz - oy) / den;
+    if (tt < 0) return null;
+    const hx = ox + dx * tt, hz = oz + dz * tt;
+    return hx >= p.ix * G && hx <= p.ix * G + G && hz >= p.iz * G && hz <= p.iz * G + G ? tt : null;
   };
+  // Raster für Bauteile: Strahltest läuft nur durch die berührten Zellen (schnell auch bei vielen Bauteilen)
+  const CK = (ix, iz) => (ix + 600) * 1200 + (iz + 600);
+  class PGrid {
+    constructor() { this.cells = new Map(); this.stamp = 0; this.marks = new Map(); }
+    cellsOf(p) { return p.t === 'w' ? (p.d === 0 ? [CK(p.ix, p.iz), CK(p.ix, p.iz - 1)] : [CK(p.ix, p.iz), CK(p.ix - 1, p.iz)]) : [CK(p.ix, p.iz)]; }
+    add(p) { for (const k of this.cellsOf(p)) { let a = this.cells.get(k); if (!a) this.cells.set(k, (a = [])); if (a.indexOf(p) < 0) a.push(p); } }
+    remove(p) { for (const k of this.cellsOf(p)) { const a = this.cells.get(k); if (!a) continue; const i = a.indexOf(p); if (i >= 0) { a[i] = a[a.length - 1]; a.pop(); } if (!a.length) this.cells.delete(k); } this.marks.delete(p); }
+    clear() { this.cells.clear(); this.marks.clear(); }
+    ray(ox, oy, oz, dx, dy, dz, max) {
+      const st = ++this.stamp, mk = this.marks; let best = max, key = null;
+      let ix = Math.floor(ox / G), iz = Math.floor(oz / G);
+      const sx = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1, ax = Math.abs(dx), az = Math.abs(dz);
+      let tx = ax < 1e-9 ? Infinity : (sx > 0 ? (ix + 1) * G - ox : ox - ix * G) / ax;
+      let tz = az < 1e-9 ? Infinity : (sz > 0 ? (iz + 1) * G - oz : oz - iz * G) / az;
+      const ddx = ax < 1e-9 ? Infinity : G / ax, ddz = az < 1e-9 ? Infinity : G / az;
+      for (let n = 0; n < 512; n++) {
+        const a = this.cells.get(CK(ix, iz));
+        if (a) for (let i = 0; i < a.length; i++) {
+          const p = a[i]; if (mk.get(p) === st) continue; mk.set(p, st);
+          const t = S.rayPiece(p, ox, oy, oz, dx, dy, dz);
+          if (t !== null && t < best) { best = t; key = p.key; }
+        }
+        const nt = Math.min(tx, tz);
+        if (nt > best) break;
+        if (tx < tz) { ix += sx; tx += ddx; } else { iz += sz; tz += ddz; }
+      }
+      return key ? { t: best, key } : null;
+    }
+  }
+  S.PGrid = PGrid;
+  S.packPiece = (p) => { const o = { t: p.t, ix: p.ix, iy: p.iy, iz: p.iz, mat: p.mat, key: p.key, hp: Math.round(p.hp) }; if (p.t === 'w') { o.d = p.d; if (p.v) o.v = 1; } if (p.t === 'r') o.rot = p.rot; return o; };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = S; else window.S = S;
 })();
