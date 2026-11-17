@@ -6,7 +6,8 @@ const G = S.G, H = S.H, SHIPY = S.SHIPY;
 const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
 const TOTAL = +process.env.TOTAL || 100, LOBBY = +process.env.LOBBY || 15;
-const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40;
+const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
+const OT = ['tree', 'rock', 'crate', 'barrel'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
 // ---------- Webserver
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png' };
@@ -77,12 +78,13 @@ function teamsAlive() { const t = new Set(); for (const e of entList) if (e.aliv
 
 // ---------- Beute
 function rndWeapon(minR = 0) {
-  const w = wpick({ ar: 30, smg: 22, shotgun: 22, pistol: 16, sniper: 10 });
-  const r = Math.max(minR, +wpick({ 0: 40, 1: 30, 2: 18, 3: 9, 4: 3 }));
+  const w = wpick({ ar: 28, smg: 20, shotgun: 18, pistol: 14, sniper: 7, tac: 10, hunt: 6, rpg: 3 });
+  const r = Math.min(4, Math.max(minR, +wpick({ 0: 40, 1: 30, 2: 18, 3: 9, 4: 3 }), w === 'rpg' ? 2 : 0));
   return { k: 'w', w, r, mag: S.W[w].mag };
 }
-function rndCons() { const c = wpick({ band: 30, mini: 26, pot: 17, med: 12, gren: 15 }); return { k: 'c', c, n: c === 'band' ? 5 : c === 'mini' || c === 'gren' ? 2 : 1 }; }
-function ammoFor(w) { const a = S.W[w].ammo; return { k: 'a', a, n: { light: 30, medium: 30, shells: 8, heavy: 6 }[a] }; }
+function rndCons() { const c = wpick({ band: 28, mini: 24, pot: 15, med: 11, gren: 12, stink: 6, chug: 3, bush: 4 }); return { k: 'c', c, n: c === 'band' ? 5 : c === 'mini' || c === 'gren' || c === 'stink' ? 2 : 1 }; }
+const AMMO_N = { light: 30, medium: 30, shells: 8, heavy: 6, rockets: 3 };
+function ammoFor(w) { const a = S.W[w].ammo; return { k: 'a', a, n: AMMO_N[a] }; }
 function addLoot(item, x, y, z, ann) {
   const l = { id: lootId++, x: r2(x), y: r2(y), z: r2(z), i: item };
   world.loot.set(l.id, l);
@@ -98,10 +100,11 @@ function scatter(items, x, y, z, ann) {
 }
 
 // ---------- Welt
-function addPiece(p, ann) {
+function addPiece(p, ann, grow) {
   p.key = S.pkey(p);
   if (world.pieces.has(p.key)) return null;
-  p.hp = S.MATS[p.mat].hp;
+  const M = S.MATS[p.mat]; p.hp = M.hp;
+  if (grow) { p.hp = M.hp * 0.25; p.rate = (M.hp * 0.75) / M.bt; world.growing.add(p); }
   world.pieces.set(p.key, p); world.pg.add(p);
   if (ann) broadcast({ t: 'pc+', p: S.packPiece(p) });
   return p;
@@ -109,7 +112,7 @@ function addPiece(p, ann) {
 function hitPiece(key, dmg) {
   const p = world.pieces.get(key); if (!p) return false;
   p.hp -= dmg;
-  if (p.hp <= 0) { world.pieces.delete(key); world.pg.remove(p); broadcast({ t: 'pc-', k: key }); }
+  if (p.hp <= 0) { world.pieces.delete(key); world.pg.remove(p); world.growing.delete(p); broadcast({ t: 'pc-', k: key }); }
   else broadcastNear({ t: 'pchp', k: key, hp: Math.round(p.hp) }, (p.ix + 0.5) * G, (p.iz + 0.5) * G, 160);
   return true;
 }
@@ -120,106 +123,119 @@ function explodeCar(car, attacker) {
   for (const e of entList) if (e.car === car.id) e.car = null;
   forNear(car.x, car.z, 8, (e) => { const d = Math.hypot(e.x - car.x, e.y - car.y, e.z - car.z); if (e.alive && d < 6.5) damage(e, e.id === car.drv ? 60 : 40, attacker, 'car', false, [(e.x - car.x) / (d || 1) * 9, 7, (e.z - car.z) / (d || 1) * 9]); });
 }
+const PT = {
+  city: { want: 9, w: [3, 3], s: [3, 5], mats: { stone: 5, metal: 4, wood: 1 } },
+  town: { want: 7, w: [2, 3], s: [1, 2], mats: { wood: 5, stone: 4, metal: 1 } },
+  farm: { want: 4, w: [2, 4], s: [1, 2], mats: { wood: 8, stone: 2 } },
+  factory: { want: 4, w: [3, 4], s: [2, 2], mats: { metal: 7, stone: 3 } },
+  harbor: { want: 6, w: [2, 2], s: [1, 1], mats: { wood: 9, metal: 1 } },
+  camp: { want: 3, w: [2, 2], s: [1, 1], mats: { wood: 1 } },
+  fort: { want: 4, w: [3, 3], s: [2, 3], mats: { stone: 1 } },
+};
+function ringPos(rmax, rmin = 0) { const a = Math.random() * 6.283, r = rmin + Math.sqrt(Math.random()) * (rmax - rmin); return [Math.cos(a) * r, Math.sin(a) * r]; }
 function genWorld() {
-  world = { objs: new Map(), chests: new Map(), pieces: new Map(), pg: new S.PGrid(), loot: new Map(), cars: new Map(), houses: [], grid: new Map() };
-  let oid = 1;
+  world = { objs: new Map(), chests: new Map(), pieces: new Map(), pg: new S.PGrid(), loot: new Map(), cars: new Map(), houses: [], grid: new Map(), vans: [], cards: new Map(), gas: [], growing: new Set(), oid: 1 };
+  const nid = () => world.oid++;
   const rects = [];
+  const free = (cx, cz, w, d, pad) => !rects.some((h) => cx < h.cx + h.w + pad && cx + w + pad > h.cx && cz < h.cz + h.d + pad && cz + d + pad > h.cz);
   for (const poi of S.POIS) {
-    const want = 5 + rnd(3);
-    const placed = [];
-    for (let tries = 0; tries < 120 && placed.length < want; tries++) {
-      const big = poi.n === 'Turmstadt' && !placed.length;
-      const w = big ? 3 : 2 + rnd(2), d = big ? 3 : 2 + rnd(2);
-      const a = Math.random() * 6.283, rr = big ? 0 : Math.random() * (poi.r - 15);
+    const T = PT[poi.t], placed = [];
+    for (let tries = 0; tries < 160 && placed.length < T.want; tries++) {
+      const big = poi.t === 'city' && !placed.length;
+      const w = big ? 4 : T.w[0] + rnd(T.w[1] - T.w[0] + 1), d = big ? 4 : Math.max(2, T.w[0] + rnd(T.w[1] - T.w[0] + 1) - (poi.t === 'farm' ? 1 : 0));
+      const a = Math.random() * 6.283, rr = big ? 0 : Math.random() * (poi.r - 14);
       const cx = Math.floor((poi.x + Math.cos(a) * rr) / G) - (w >> 1), cz = Math.floor((poi.z + Math.sin(a) * rr) / G) - (d >> 1);
-      if (placed.some((h) => cx < h.cx + h.w + 2 && cx + w + 2 > h.cx && cz < h.cz + h.d + 2 && cz + d + 2 > h.cz)) continue;
-      placed.push({ cx, cz, w, d });
-      rects.push({ cx, cz, w, d });
-      const mat = big ? 'stone' : wpick({ wood: 45, stone: 40, metal: 15 });
-      const storeys = big ? 4 : Math.random() < 0.45 ? 2 : 1;
-      const door = rnd(w);
+      if (!free(cx, cz, w, d, 2)) continue;
+      placed.push(1); rects.push({ cx, cz, w, d });
+      const mat = wpick(T.mats), storeys = big ? 6 : T.s[0] + rnd(T.s[1] - T.s[0] + 1), door = rnd(w);
       world.houses.push([cx, cz, w, d, poi.l, storeys, door, mat[0]]);
-      for (let s = 0; s < storeys; s++) {
-        const iy = poi.l + s;
+      for (let st = 0; st < storeys; st++) {
+        const iy = poi.l + st;
         for (let i = 0; i < w; i++) {
-          if (!(s === 0 && i === door)) addPiece({ t: 'w', ix: cx + i, iy, iz: cz, d: 0, mat, v: Math.random() < 0.3 ? 1 : 0 });
+          addPiece({ t: 'w', ix: cx + i, iy, iz: cz, d: 0, mat, v: st === 0 && i === door ? 2 : Math.random() < 0.3 ? 1 : 0 });
           addPiece({ t: 'w', ix: cx + i, iy, iz: cz + d, d: 0, mat, v: Math.random() < 0.4 ? 1 : 0 });
         }
         for (let j = 0; j < d; j++) {
           addPiece({ t: 'w', ix: cx, iy, iz: cz + j, d: 1, mat, v: Math.random() < 0.4 ? 1 : 0 });
           addPiece({ t: 'w', ix: cx + w, iy, iz: cz + j, d: 1, mat, v: Math.random() < 0.4 ? 1 : 0 });
         }
-        const stairs = s < storeys - 1;
+        const stairs = st < storeys - 1;
         for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) {
           if (stairs && i === 0 && j === d - 1) addPiece({ t: 'r', ix: cx, iy, iz: cz + d - 1, rot: 0, mat });
           else addPiece({ t: 'f', ix: cx + i, iy: iy + 1, iz: cz + j, mat });
         }
       }
-      const ci = w - 1, cj = rnd(d), top = storeys === 2 && Math.random() < 0.6;
-      const ch = { id: oid++, x: (cx + ci + 0.5) * G, y: (poi.l + (top ? 1 : 0)) * H + (top ? 0.12 : 0), z: (cz + cj + 0.5) * G, open: 0 };
+      const fl = Math.min(storeys - 1, rnd(storeys)), ci = w - 1, cj = rnd(d);
+      const ch = { id: nid(), x: (cx + ci + 0.5) * G, y: (poi.l + fl) * H + (fl ? 0.12 : 0), z: (cz + cj + 0.5) * G, open: 0, k: 'c' };
       world.chests.set(ch.id, ch);
-      if (big) for (let s2 = 1; s2 <= 4; s2++) { const c2 = { id: oid++, x: (cx + 1 + (s2 % 2) + 0.5) * G, y: (poi.l + s2) * H + 0.12, z: (cz + 0.5) * G, open: 0 }; world.chests.set(c2.id, c2); }
+      if (big) for (let s2 = 1; s2 < storeys; s2 += 1) { const c2 = { id: nid(), x: (cx + 1 + (s2 % 3) + 0.5) * G, y: (poi.l + s2) * H + 0.12, z: (cz + 0.5) * G, open: 0, k: 'c' }; world.chests.set(c2.id, c2); }
+      if (Math.random() < 0.45 && w > 1) { const ab = { id: nid(), x: (cx + 0.5) * G, y: poi.l * H, z: (cz + 0.5) * G, open: 0, k: 'a' }; world.chests.set(ab.id, ab); }
       if (Math.random() < 0.8) {
-        const lx = (cx + rnd(w) + 0.5) * G, lz = (cz + 0.5) * G;
+        const lx = (cx + rnd(w) + 0.5) * G, lz = (cz + d - 0.5) * G;
         const it = Math.random() < 0.6 ? rndWeapon() : rndCons();
         addLoot(it, lx, poi.l * H, lz);
-        if (it.k === 'w') addLoot(ammoFor(it.w), lx + 0.8, poi.l * H, lz + 0.5);
+        if (it.k === 'w') addLoot(ammoFor(it.w), lx + 0.8, poi.l * H, lz - 0.5);
       }
     }
-    for (let i = 0, t = 0; i < 7 && t < 60; t++) {
-      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 3);
-      const x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr, cx = x / G, cz = z / G;
-      if (placed.some((h) => cx > h.cx - 0.4 && cx < h.cx + h.w + 0.4 && cz > h.cz - 0.4 && cz < h.cz + h.d + 0.4)) continue;
+    for (let i = 0, t = 0; i < 8 && t < 60; t++) {
+      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 3), x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr;
+      if (!free(x / G - 0.3, z / G - 0.3, 0.6, 0.6, 0.4)) continue;
       const tp = Math.random() < 0.6 ? 'crate' : 'barrel';
-      world.objs.set(oid, { id: oid++, t: tp, x: r1(x), z: r1(z), s: tp === 'crate' ? r2(0.8 + Math.random() * 0.5) : 1, hp: 68 }); i++;
+      world.objs.set(world.oid, { id: nid(), t: tp, x: r1(x), z: r1(z), s: tp === 'crate' ? r2(0.8 + Math.random() * 0.5) : 1, hp: 68 }); i++;
     }
-    for (let i = 0, t = 0; i < 4 && t < 40; t++) {
-      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 4);
-      const x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr, cx = x / G, cz = z / G;
-      if (placed.some((h) => cx > h.cx - 1 && cx < h.cx + h.w + 1 && cz > h.cz - 1 && cz < h.cz + h.d + 1)) continue;
-      addCar(oid++, x, z); i++;
+    for (let i = 0, t = 0; i < 3 && t < 40; t++) {
+      const a = Math.random() * 6.283, rr = Math.random() * (poi.r - 4), x = poi.x + Math.cos(a) * rr, z = poi.z + Math.sin(a) * rr;
+      if (!free(x / G - 1, z / G - 1, 2, 2, 0.5)) continue;
+      addCar(nid(), x, z); i++;
     }
   }
-  for (let i = 0; i < 440; i++) {
-    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 228, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-    if (S.height(x, z) < 0.8 || S.poiAt(x, z, 5)) continue;
-    world.objs.set(oid, { id: oid++, t: 'tree', x: r1(x), z: r1(z), s: r2(0.8 + Math.random() * 0.7), hp: 100 });
-  }
-  for (let i = 0; i < 150; i++) {
-    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 232, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-    if (S.height(x, z) < 0.3 || S.poiAt(x, z, 2)) continue;
-    world.objs.set(oid, { id: oid++, t: 'rock', x: r1(x), z: r1(z), s: r2(0.7 + Math.random() * 0.9), hp: 150 });
-  }
-  for (let i = 0, t = 0; i < 10 && t < 100; t++) {
-    const a = Math.random() * 6.283, rr = 40 + Math.sqrt(Math.random()) * 165, x = Math.cos(a) * rr, z = Math.sin(a) * rr, h = S.height(x, z);
+  // Rückkehr-Stationen am Rand einiger Orte
+  S.POIS.forEach((p, i) => {
+    if (i % 2) return;
+    for (let t = 0; t < 30; t++) {
+      const a = Math.random() * 6.283, x = p.x + Math.cos(a) * (p.r + 10), z = p.z + Math.sin(a) * (p.r + 10), h = S.height(x, z);
+      if (h < 1 || !free(x / G - 1, z / G - 1, 2, 2, 1)) continue;
+      rects.push({ cx: Math.floor(x / G) - 1, cz: Math.floor(z / G) - 1, w: 2, d: 2 });
+      world.vans.push({ id: nid(), x: r1(x), y: r2(h), z: r1(z), yaw: r2(Math.atan2(p.x - x, p.z - z)) }); break;
+    }
+  });
+  // Wachtürme
+  for (let i = 0, t = 0; i < 30 && t < 300; t++) {
+    const [x, z] = ringPos(S.R * 0.82, 40), h = S.height(x, z);
     if (h < 2 || S.poiAt(x, z, 14) || S.roadDist(x, z) < 6) continue;
     const cx = Math.floor(x / G), cz = Math.floor(z / G), l = Math.floor((h + 0.4) / H), mat = Math.random() < 0.5 ? 'wood' : 'metal';
-    if (rects.some((r) => Math.abs(r.cx - cx) < 6 && Math.abs(r.cz - cz) < 6)) continue;
+    if (!free(cx - 4, cz - 4, 10, 10, 0)) continue;
     rects.push({ cx, cz, w: 2, d: 2 });
-    for (let s = 0; s < 3; s++) addPiece({ t: 'r', ix: cx, iy: l + s, iz: cz, rot: s % 2 ? 2 : 0, mat });
+    for (let st = 0; st < 3; st++) addPiece({ t: 'r', ix: cx, iy: l + st, iz: cz, rot: st % 2 ? 2 : 0, mat });
     for (const [a2, b2] of [[0, 1], [1, 1], [1, 0]]) addPiece({ t: 'f', ix: cx + a2, iy: l + 3, iz: cz + b2, mat });
-    for (let s = 0; s < 3; s++) { addPiece({ t: 'w', ix: cx + 1, iy: l + s, iz: cz, d: 1, mat }); addPiece({ t: 'w', ix: cx, iy: l + s, iz: cz, d: 1, mat }); }
-    const tc = { id: oid++, x: (cx + 1.5) * G, y: (l + 3) * H + 0.12, z: (cz + 1.5) * G, open: 0 }; world.chests.set(tc.id, tc);
+    for (let st = 0; st < 3; st++) { addPiece({ t: 'w', ix: cx + 1, iy: l + st, iz: cz, d: 1, mat }); addPiece({ t: 'w', ix: cx, iy: l + st, iz: cz, d: 1, mat }); }
+    const tc = { id: nid(), x: (cx + 1.5) * G, y: (l + 3) * H + 0.12, z: (cz + 1.5) * G, open: 0, k: 'c' }; world.chests.set(tc.id, tc);
     i++;
   }
-  for (let i = 0; i < 14; i++) {
-    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 210, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-    if (S.height(x, z) > 1.5 && !S.poiAt(x, z, 4)) addCar(oid++, x, z);
+  for (let i = 0; i < 4400; i++) {
+    const [x, z] = ringPos(S.R * 0.93);
+    if (S.height(x, z) < 0.8 || S.poiAt(x, z, 5)) continue;
+    world.objs.set(world.oid, { id: nid(), t: 'tree', x: r1(x), z: r1(z), s: r2(0.8 + Math.random() * 0.7), hp: 100 });
   }
-  for (let i = 0; i < 50; i++) {
-    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 215, x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+  for (let i = 0; i < 1400; i++) {
+    const [x, z] = ringPos(S.R * 0.95);
+    if (S.height(x, z) < 0.3 || S.poiAt(x, z, 2)) continue;
+    world.objs.set(world.oid, { id: nid(), t: 'rock', x: r1(x), z: r1(z), s: r2(0.7 + Math.random() * 0.9), hp: 150 });
+  }
+  for (let i = 0; i < 40; i++) { const [x, z] = ringPos(S.R * 0.85); if (S.height(x, z) > 1.5 && !S.poiAt(x, z, 4)) addCar(nid(), x, z); }
+  for (let i = 0; i < 300; i++) {
+    const [x, z] = ringPos(S.R * 0.88);
     if (S.height(x, z) < 1 || S.poiAt(x, z, 4)) continue;
-    world.chests.set(oid, { id: oid++, x: r1(x), y: S.height(x, z), z: r1(z), open: 0 });
+    world.chests.set(world.oid, { id: nid(), x: r1(x), y: S.height(x, z), z: r1(z), open: 0, k: Math.random() < 0.3 ? 'a' : 'c' });
   }
-  for (let i = 0; i < 130; i++) {
-    const a = Math.random() * 6.283, rr = Math.sqrt(Math.random()) * 215, x = Math.cos(a) * rr, z = Math.sin(a) * rr, y = S.height(x, z);
+  for (let i = 0; i < 900; i++) {
+    const [x, z] = ringPos(S.R * 0.88), y = S.height(x, z);
     if (y < 1) continue;
     const r = Math.random();
-    const it = r < 0.5 ? rndWeapon() : r < 0.75 ? rndCons() : { k: 'a', a: pick(Object.keys(S.AMMO)), n: 20 };
+    const it = r < 0.5 ? rndWeapon() : r < 0.75 ? rndCons() : { k: 'a', a: pick(['light', 'medium', 'shells', 'heavy']), n: 20 };
     addLoot(it, x, y, z);
     if (it.k === 'w') addLoot(ammoFor(it.w), x + 0.9, S.height(x + 0.9, z), z);
   }
-  // Objekte entfernen, die in Gebäuden oder auf Straßen stehen; Raster für Bots
   for (const o of [...world.objs.values()]) {
     const cx = o.x / G, cz = o.z / G;
     if ((o.t === 'tree' || o.t === 'rock') && (S.roadDist(o.x, o.z) < 4.5 || rects.some((r) => cx > r.cx - 0.6 && cx < r.cx + r.w + 0.6 && cz > r.cz - 1.6 && cz < r.cz + r.d + 0.6))) { world.objs.delete(o.id); continue; }
@@ -228,9 +244,12 @@ function genWorld() {
     if (!world.grid.has(k)) world.grid.set(k, []); world.grid.get(k).push(o);
   }
 }
+const packChest = (c) => { const o = { id: c.id, x: r2(c.x), y: r2(c.y), z: r2(c.z), open: c.open, k: c.k }; if (c.k === 'd') { o.sp = r1(c.sp); o.land = r1(c.land); } return o; };
+const packCard = (c) => ({ id: c.id, x: r2(c.x), y: r2(c.y), z: r2(c.z), o: c.o, team: c.team });
 const packWorld = () => ({
-  objs: [...world.objs.values()].map((o) => ({ id: o.id, t: o.t, x: o.x, z: o.z, s: o.s })), chests: [...world.chests.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, open: c.open })),
-  pieces: [...world.pieces.values()].map(S.packPiece), loot: [...world.loot.values()], houses: world.houses,
+  objs: [...world.objs.values()].map((o) => [o.id, OT.indexOf(o.t), o.x, o.z, o.s]), chests: [...world.chests.values()].map(packChest),
+  pieces: [...world.pieces.values()].map((p) => [PTY.indexOf(p.t), p.ix, p.iy, p.iz, p.t === 'w' ? p.d : p.rot | 0, MT.indexOf(p.mat), p.v | 0]),
+  loot: [...world.loot.values()], houses: world.houses, vans: world.vans, cards: [...world.cards.values()].map(packCard),
   cars: [...world.cars.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v, hue: c.hue, drv: c.drv })),
 });
 
@@ -238,9 +257,9 @@ const packWorld = () => ({
 function chooseNext() {
   const st = S.STORM[storm.i];
   storm.nr = S.R * st.f;
-  const a = Math.random() * 6.283, d = Math.random() * Math.max(0, Math.min(storm.r, 225) - storm.nr) * 0.9;
+  const a = Math.random() * 6.283, d = Math.random() * Math.max(0, Math.min(storm.r, S.R * 0.9) - storm.nr) * 0.9;
   storm.nx = storm.x + Math.cos(a) * d; storm.nz = storm.z + Math.sin(a) * d;
-  const m = Math.hypot(storm.nx, storm.nz), lim = Math.max(0, 215 - storm.nr);
+  const m = Math.hypot(storm.nx, storm.nz), lim = Math.max(0, S.R * 0.8 - storm.nr);
   if (m > lim && m > 0) { storm.nx *= lim / m; storm.nz *= lim / m; }
 }
 function tickStorm(dt) {
@@ -254,17 +273,26 @@ function tickStorm(dt) {
     storm.x = lerp(storm.fx, storm.nx, k); storm.z = lerp(storm.fz, storm.nz, k); storm.r = lerp(storm.fr, storm.nr, k);
     if (storm.timer <= 0) {
       storm.i++;
-      if (S.STORM[storm.i]) { storm.shrink = false; storm.timer = S.STORM[storm.i].wait; chooseNext(); }
+      if (S.STORM[storm.i]) { storm.shrink = false; storm.timer = S.STORM[storm.i].wait; chooseNext(); if (storm.i <= 6) spawnDrop(); }
       else { storm.done = true; storm.i = S.STORM.length - 1; storm.timer = 0; }
     }
   }
 }
 
+function spawnDrop() {
+  for (let t = 0; t < 25; t++) {
+    const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * Math.max(10, storm.nr * 0.75), x = storm.nx + Math.cos(a) * d, z = storm.nz + Math.sin(a) * d, h = S.height(x, z);
+    if (h < 1 || S.poiAt(x, z, 2)) continue;
+    const ch = { id: world.oid++, x, y: h, z, open: 0, k: 'd', sp: gameT, land: gameT + 22 };
+    world.chests.set(ch.id, ch); broadcast({ t: 'sd', c: packChest(ch) }); return;
+  }
+}
 // ---------- Schaden, Niederschlagen, Eliminieren
 function damage(target, amount, attacker, wname, head, kb) {
   if (phase !== 'game' || !target || !target.alive || (target.fl & 1) || amount <= 0) return;
   if (attacker && attacker !== target && attacker.team === target.team) return;
-  if (attacker === target && wname === 'gren') { if (kb) send(target, { t: 'hurt', ax: null, az: null, kb }); return; }
+  if (attacker === target && (wname === 'gren' || wname === 'rocket' || wname === 'stink')) { if (kb) send(target, { t: 'hurt', ax: null, az: null, kb }); return; }
+  if (target.bush && wname !== 'storm') target.bush = false;
   const sh0 = target.sh;
   let d = amount;
   if (!target.down) { const s = Math.min(target.sh, d); target.sh -= s; d -= s; }
@@ -301,8 +329,13 @@ function kill(target, attacker, wname) {
     scatter(items, target.x, target.y, target.z, true);
   }
   // Teammate liegt am Boden und niemand steht mehr: Team ist raus
+  target.card = null; target.rbt = null;
   const m = target.mate;
   if (m && m.alive && m.down) kill(m, m.knockBy, 'bleed');
+  if (m && m.alive && phase === 'game' && wname !== 'quit' && matchMode === 'duo') {
+    const cd = { id: world.oid++, x: target.x, y: Math.max(target.y, S.height(target.x, target.z)), z: target.z, o: target.id, team: target.team, until: gameT + 90 };
+    world.cards.set(cd.id, cd); broadcast({ t: 'card+', c: packCard(cd) });
+  }
   checkWin();
 }
 function finish(team) {
@@ -318,6 +351,33 @@ function startRevive(e, v) {
   broadcast({ t: 'rev', v: v.id, by: e.id, on: 1 });
 }
 function stopRevive(e) { if (!e.rev) return; broadcast({ t: 'rev', v: e.rev.v.id, by: e.id, on: 0 }); e.rev = null; }
+function stopReboot(e) { if (!e.rbt) return; broadcast({ t: 'rbt', by: e.id, on: 0 }); e.rbt = null; }
+function startReboot(e, van) {
+  if (!standing(e) || !e.card || !van || e.rbt || Math.hypot(van.x - e.x, van.z - e.z) > 5) return;
+  e.rbt = { van, t: gameT }; releaseCar(e); broadcast({ t: 'rbt', by: e.id, on: 1, v: e.card });
+}
+function reboot(o, van, by) {
+  if (!o || o.alive || o.team !== by.team || (!o.bot && !clients.has(o.id))) return false;
+  Object.assign(o, { alive: true, hp: 100, sh: 0, down: false, rev: null, knockBy: null, car: null, fl: 0, bush: false, card: null, rbt: null, x: van.x + 1.5, y: van.y, z: van.z + 1.5, dropped: false });
+  if (o.bot) { Object.assign(o, { st: 'ground', tgt: null, chest: null, jy: 0, jv: 0, emoteT: 0 }); armBot(o, 'pistol', 0); newWaypoint(o); }
+  else send(o, { t: 'reborn', x: o.x, y: o.y, z: o.z });
+  broadcast({ t: 'rebooted', v: o.id, by: by.id });
+  return true;
+}
+function tickWorld(dt) {
+  for (const p of world.growing) { if (!world.pieces.has(p.key)) { world.growing.delete(p); continue; } const mx = S.MATS[p.mat].hp; p.hp = Math.min(mx, p.hp + p.rate * dt); if (p.hp >= mx) world.growing.delete(p); }
+  for (const [id, c] of world.cards) if (gameT > c.until || !entMap.get(c.o) || entMap.get(c.o).alive) { world.cards.delete(id); broadcast({ t: 'card-', id, by: 0 }); }
+  for (let i = world.gas.length - 1; i >= 0; i--) {
+    const g = world.gas[i]; g.acc += dt;
+    if (g.acc >= 0.5) { g.acc = 0; forNear(g.x, g.z, 8, (e) => { if (e.alive && !(e.fl & 1) && e !== g.by && Math.hypot(e.x - g.x, e.y + 0.9 - g.y, e.z - g.z) < 5.5) damage(e, 5, g.by, 'stink'); }); }
+    if (gameT > g.until) world.gas.splice(i, 1);
+  }
+  for (const e of entList) if (e.rbt) {
+    const v = e.rbt.van;
+    if (!standing(e) || !e.card || Math.hypot(v.x - e.x, v.z - e.z) > 5.5) stopReboot(e);
+    else if (gameT - e.rbt.t >= REBOOT) { const o = entMap.get(e.card); e.rbt = null; if (reboot(o, v, e)) e.card = null; else { e.card = null; broadcast({ t: 'rbt', by: e.id, on: 0 }); } }
+  }
+}
 function tickDowned(dt) {
   for (const e of entList) {
     if (e.rev) {
@@ -333,11 +393,11 @@ function tickDowned(dt) {
 const BN = ['Flitzer', 'Keks', 'Wolke', 'Pixel', 'Brumm', 'Zack', 'Mango', 'Nebel', 'Turbo', 'Fuchs', 'Kiesel', 'Rakete', 'Socke', 'Blitz', 'Krümel', 'Otter', 'Zimt', 'Kaktus', 'Nudel', 'Falke', 'Kobold', 'Pfeffer', 'Schnecke', 'Dino', 'Komet', 'Ninja', 'Waffel', 'Panda', 'Gecko', 'Sturmi'];
 function shipPos() { const k = Math.min(1.15, gameT / ship.dur); return { x: lerp(ship.ax, ship.bx, k), z: lerp(ship.az, ship.bz, k) }; }
 function resetEnt(e) {
-  Object.assign(e, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, yaw: 0, pitch: 0, w: 'pick', wr: 0, car: null, down: false, rev: null, knockBy: null, team: 0, mate: null });
+  Object.assign(e, { inMatch: true, alive: true, hp: 100, sh: 0, fl: 1, kills: 0, x: ship.ax, y: SHIPY, z: ship.az, yaw: 0, pitch: 0, w: 'pick', wr: 0, car: null, down: false, rev: null, knockBy: null, team: 0, mate: null, bush: false, card: null, rbt: null, proj: {} });
 }
 function makeBot(name) {
   const b = { id: nextId++, bot: true, name, hue: rnd(360), style: rnd(16),
-    st: 'ship', jumpAt: 3 + Math.random() * 23, tx: 0, tz: 0, wx: 0, wz: 0, wpn: null, armAt: 0, nextShot: 0, tgt: null, nextScan: Math.random(), strafe: 1, nextStrafe: 0, nextWp: 0, nextHack: 0,
+    st: 'ship', jumpAt: 3 + Math.random() * 46, tx: 0, tz: 0, wx: 0, wz: 0, wpn: null, armAt: 0, nextShot: 0, tgt: null, nextScan: Math.random(), strafe: 1, nextStrafe: 0, nextWp: 0, nextHack: 0,
     skill: 0.55 + Math.random() * 0.6, jy: 0, jv: 0, stuck: 0, detourT: 0, detourA: 0, swT: 0, coverT: 0, relT: 0, relDone: false, emoteT: 0, mag: 0, burst: 4, threat: null, threatT: 0, nextWall: 0, seen: null, chest: null, nextChest: 0,
     ox: (Math.random() - 0.5) * 6, oz: (Math.random() - 0.5) * 6, lead: null };
   resetEnt(b);
@@ -346,11 +406,13 @@ function makeBot(name) {
 function startMatch() {
   genWorld(); gameT = 0; phase = 'game'; noHumansT = 0; stormAcc = 0; matchMode = mode;
   const a = Math.random() * 6.283;
-  ship = { ax: -Math.cos(a) * 270, az: -Math.sin(a) * 270, bx: Math.cos(a) * 270, bz: Math.sin(a) * 270, dur: 30 };
-  storm = { i: 0, x: 0, z: 0, r: 300, fx: 0, fz: 0, fr: 300, nx: 0, nz: 0, nr: 300, timer: S.STORM[0].wait, shrink: false, done: false };
+  const off = (Math.random() - 0.5) * S.R * 0.5, L = S.R + 90, px = -Math.sin(a) * off, pz = Math.cos(a) * off;
+  ship = { ax: px - Math.cos(a) * L, az: pz - Math.sin(a) * L, bx: px + Math.cos(a) * L, bz: pz + Math.sin(a) * L, dur: 54 };
+  const R0 = S.R + 140;
+  storm = { i: 0, x: 0, z: 0, r: R0, fx: 0, fz: 0, fr: R0, nx: 0, nz: 0, nr: R0, timer: S.STORM[0].wait, shrink: false, done: false };
   chooseNext();
   const hs = humans();
-  for (const c of hs) { resetEnt(c); Object.assign(c, { lastShot: {}, lastHarvest: 0, lastRam: 0, nades: 0, lastNade: 0, dropped: false, spec: 0 }); }
+  for (const c of hs) { resetEnt(c); Object.assign(c, { lastShot: {}, lastHarvest: 0, lastRam: 0, lastNade: 0, dropped: false, spec: 0 }); }
   const names = BN.slice().sort(() => Math.random() - 0.5);
   bots = [];
   for (let i = hs.length; i < TOTAL; i++) bots.push(makeBot(names[i % names.length] + (10 + rnd(89))));
@@ -366,7 +428,7 @@ function startMatch() {
 }
 function toLobby() {
   phase = 'lobby'; lobbyT = LOBBY; bots = [];
-  for (const c of clients.values()) { c.inMatch = false; c.alive = false; c.car = null; c.down = false; c.rev = null; c.mate = null; }
+  for (const c of clients.values()) { c.inMatch = false; c.alive = false; c.car = null; c.down = false; c.rev = null; c.mate = null; c.card = null; c.rbt = null; c.bush = false; }
   rebuildEnts();
   broadcast({ t: 'lobby' });
 }
@@ -382,9 +444,9 @@ function newWaypoint(b, force) {
   let cx = storm.x, cz = storm.z, r = storm.r * 0.6;
   if (!force && storm.nr > 0) { cx = storm.nx; cz = storm.nz; r = storm.nr * 0.8; }
   else if (force) { cx = storm.nx; cz = storm.nz; r = storm.nr * 0.6; }
-  const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * Math.min(r, 120);
+  const a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * Math.min(r, 260);
   b.wx = cx + Math.cos(a) * d; b.wz = cz + Math.sin(a) * d;
-  clampLand(b, 'wx', 'wz', 215);
+  clampLand(b, 'wx', 'wz', LIM);
   b.nextWp = gameT + 12 + Math.random() * 15;
 }
 function los(a, e, d) {
@@ -427,6 +489,17 @@ function botWall(b, a) {
 }
 function openChest(ch) {
   ch.open = 1; broadcast({ t: 'chest', id: ch.id });
+  if (ch.k === 'a') {
+    const a = pick(['light', 'medium', 'shells', 'heavy']), b = pick(['light', 'medium', 'shells', 'heavy', 'rockets']);
+    const items = [{ k: 'a', a, n: AMMO_N[a] * 2 }, { k: 'a', a: b, n: AMMO_N[b] }];
+    if (Math.random() < 0.45) items.push({ k: 'c', c: Math.random() < 0.7 ? 'gren' : 'stink', n: 2 });
+    return items;
+  }
+  if (ch.k === 'd') {
+    const w1 = rndWeapon(3), w2 = rndWeapon(3);
+    w1.r = Math.random() < 0.25 ? 5 : Math.max(w1.r, 4);
+    return [w1, ammoFor(w1.w), w2, ammoFor(w2.w), { k: 'c', c: Math.random() < 0.5 ? 'chug' : 'pot', n: 1 }, { k: 'm', m: 'metal', n: 100 }, { k: 'm', m: 'wood', n: 100 }];
+  }
   const w = rndWeapon(Math.random() < 0.35 ? 2 : 0), items = [w, ammoFor(w.w), { k: 'm', m: pick(['wood', 'stone', 'metal']), n: 30 }];
   if (Math.random() < 0.65) items.push(rndCons());
   return items;
@@ -435,25 +508,28 @@ function botTick(b, dt) {
   const mate = b.mate && b.mate.alive ? b.mate : null;
   if (b.st === 'ship') {
     const p = shipPos(); b.x = p.x; b.z = p.z; b.y = SHIPY;
-    let go = gameT >= b.jumpAt || gameT > 27;
-    if (mate && !mate.bot) go = gameT > 27 || (gameT > 1.5 && !(mate.fl & 1)) || (gameT >= b.jumpAt && !mate.inMatch);
+    const last = ship.dur - 2;
+    let go = gameT >= b.jumpAt || gameT > last;
+    if (mate && !mate.bot) go = gameT > last || (gameT > 1.5 && !(mate.fl & 1)) || (gameT >= b.jumpAt && !mate.inMatch);
     if (go) {
       b.st = 'air'; b.fl = 2;
-      const cand = S.POIS.filter((p2) => Math.hypot(p2.x - b.x, p2.z - b.z) < 170);
+      const cand = S.POIS.filter((p2) => Math.hypot(p2.x - b.x, p2.z - b.z) < 380);
       const a = Math.random() * 6.283;
       if (b.lead && b.lead.st !== 'ship') { b.tx = b.lead.tx + b.ox; b.tz = b.lead.tz + b.oz; }
       else if (cand.length && Math.random() < 0.75) { const p2 = pick(cand), d = Math.random() * p2.r; b.tx = p2.x + Math.cos(a) * d; b.tz = p2.z + Math.sin(a) * d; }
-      else { const d = Math.random() * 90; b.tx = b.x + Math.cos(a) * d; b.tz = b.z + Math.sin(a) * d; }
-      clampLand(b, 'tx', 'tz', 210);
+      else { const d = Math.random() * 200; b.tx = b.x + Math.cos(a) * d; b.tz = b.z + Math.sin(a) * d; }
+      clampLand(b, 'tx', 'tz', LIM);
     }
     return;
   }
   if (b.st === 'air') {
-    if (mate && !mate.bot && !(mate.fl & 1)) { b.tx = mate.x + b.ox; b.tz = mate.z + b.oz; clampLand(b, 'tx', 'tz', 215); }
-    const dx = b.tx - b.x, dz = b.tz - b.z, l = Math.hypot(dx, dz);
-    if (l > 0.5) { const s = Math.min(l, 16 * dt); b.x += (dx / l) * s; b.z += (dz / l) * s; b.yaw = Math.atan2(-dx, -dz); }
-    const g = S.height(b.x, b.z), hi = b.y - g > 34;
-    b.fl = hi ? 2 : 4; b.y -= (hi ? 28 : 8) * dt;
+    if (mate && !mate.bot && !(mate.fl & 1)) { b.tx = mate.x + b.ox; b.tz = mate.z + b.oz; clampLand(b, 'tx', 'tz', LIM); }
+    const dx = b.tx - b.x, dz = b.tz - b.z, l = Math.hypot(dx, dz), g = S.height(b.x, b.z), above = b.y - g;
+    if (b.fl === 2 && above < 220 && l > above * 1.9) b.fl = 4;
+    if (above < 36) b.fl = 4;
+    const glide = b.fl === 4;
+    if (l > 0.5) { const s = Math.min(l, (glide ? 15 : 24) * dt); b.x += (dx / l) * s; b.z += (dz / l) * s; b.yaw = Math.atan2(-dx, -dz); }
+    b.y -= (glide ? 6.5 : 32) * dt;
     if (b.y <= g) { b.y = g; b.st = 'ground'; b.fl = 0; b.armAt = gameT + 14 + Math.random() * 10; b.chest = null; b.nextChest = 0; newWaypoint(b); }
     return;
   }
@@ -465,7 +541,8 @@ function botTick(b, dt) {
     return;
   }
   if (b.jy > 0 || b.jv > 0) { b.jv -= 22 * dt; b.jy += b.jv * dt; if (b.jy <= 0) { b.jy = 0; b.jv = 0; } }
-  if (!b.wpn && gameT >= b.armAt) armBot(b, wpick({ ar: 35, smg: 25, shotgun: 25, pistol: 15 }), +wpick({ 0: 50, 1: 30, 2: 15, 3: 5 }));
+  if (!b.wpn && gameT >= b.armAt) armBot(b, wpick({ ar: 32, smg: 22, shotgun: 20, pistol: 13, tac: 9, hunt: 4 }), +wpick({ 0: 50, 1: 30, 2: 15, 3: 5 }));
+  if (b.rbt) { const v = b.rbt.van; b.yaw = Math.atan2(-(v.x - b.x), -(v.z - b.z)); b.fl = 8; b.w = 'none'; b.pitch = 0; b.y = S.height(b.x, b.z); return; }
   if (b.rev) { const v = b.rev.v; b.yaw = Math.atan2(-(v.x - b.x), -(v.z - b.z)); b.fl = 8; b.w = 'none'; b.pitch = -0.4; b.y = S.height(b.x, b.z); return; }
   if (gameT >= b.nextScan) {
     b.nextScan = gameT + 0.45;
@@ -494,7 +571,7 @@ function botTick(b, dt) {
     const dx = t.x - b.x, dz = t.z - b.z, d = Math.hypot(dx, dz) || 1, d3 = Math.hypot(dx, t.y - b.y, dz);
     b.yaw = Math.atan2(-dx, -dz); b.pitch = Math.atan2(t.y + (t.down ? 0.3 : 1.2) - b.y - 1.4, d);
     if (gameT >= b.nextStrafe) { b.strafe = Math.random() < 0.5 ? -1 : 1; b.nextStrafe = gameT + 0.7 + Math.random() * 1.3; if (d < 22 && b.jy === 0 && Math.random() < 0.3 * b.skill) b.jv = 7.2; }
-    const want = { shotgun: 7, smg: 13, pistol: 16, ar: 22 }[b.wpn.w] || 18;
+    const want = { shotgun: 7, tac: 7, smg: 13, pistol: 16, ar: 22, hunt: 40, sniper: 45 }[b.wpn.w] || 18;
     const f = crouchNow ? 0 : d > want + 3 ? 1 : d < want - 3 ? -0.7 : 0, sf = crouchNow ? 0.25 : 0.75;
     moveBot(b, (dx / d) * f + (-dz / d) * b.strafe * sf, (dz / d) * f + (dx / d) * b.strafe * sf, crouchNow ? 2 : 4.4, dt);
     if (crouchNow) fl |= 8;
@@ -523,7 +600,12 @@ function botTick(b, dt) {
   } else {
     b.pitch = 0;
     let gx = b.wx, gz = b.wz, sp = 5, mateGoal = false;
+    let card = null, van = null;
+    if (b.card) { let vd = 1e9; for (const v of world.vans) { const dd = Math.hypot(v.x - b.x, v.z - b.z); if (dd < vd) { vd = dd; van = v; } } }
+    else if (matchMode === 'duo' && b.mate && !b.mate.alive) for (const c of world.cards.values()) if (c.team === b.team) { card = c; break; }
     if (mate && mate.down) { gx = mate.x; gz = mate.z; sp = 5.8; mateGoal = true; }
+    else if (van) { gx = van.x; gz = van.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 3.5) startReboot(b, van); }
+    else if (card) { gx = card.x; gz = card.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 2.5) { world.cards.delete(card.id); b.card = card.o; broadcast({ t: 'card-', id: card.id, by: b.id }); } }
     else if (!b.wpn && b.chest && !b.chest.open) { gx = b.chest.x; gz = b.chest.z; sp = 5.8; }
     else if (b.seen && gameT - b.seen.t < 4 && b.wpn) { gx = b.seen.x; gz = b.seen.z; sp = 5.6; }
     else if (mate && Math.hypot(mate.x - b.x, mate.z - b.z) > 22) { gx = mate.x + b.ox; gz = mate.z + b.oz; sp = 5.8; mateGoal = true; }
@@ -531,8 +613,8 @@ function botTick(b, dt) {
     const dx = gx - b.x, dz = gz - b.z, d = Math.hypot(dx, dz);
     if (mate && mate.down && d < 2.2) startRevive(b, mate);
     else if (!mateGoal && b.chest && d < 2.3) {
-      const items = openChest(b.chest), w = items.find((i) => i.k === 'w');
-      armBot(b, w.w, w.r);
+      const items = openChest(b.chest), w = items.find((i) => i.k === 'w' && i.w !== 'rpg');
+      if (w) armBot(b, w.w, w.r); else if (!b.wpn) armBot(b, 'pistol', 0);
       if (items.some((i) => i.c === 'pot' || i.c === 'mini')) b.sh = Math.min(100, b.sh + 50);
       scatter(items.filter((i) => i !== w && i.c !== 'pot' && i.c !== 'mini'), b.chest.x, b.chest.y, b.chest.z, true);
       b.chest = null;
@@ -549,7 +631,7 @@ function botTick(b, dt) {
 // ---------- Tick
 function sendStates() {
   const ents = [];
-  for (const e of entList) if (e.alive) ents.push([e, JSON.stringify([e.id, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), r2(e.pitch), Math.ceil(e.hp), Math.ceil(e.sh), e.fl | (e.down ? 512 : 0), e.w, e.wr | 0])]);
+  for (const e of entList) if (e.alive) ents.push([e, JSON.stringify([e.id, r2(e.x), r2(e.y), r2(e.z), r2(e.yaw), r2(e.pitch), Math.ceil(e.hp), Math.ceil(e.sh), e.fl | (e.down ? 512 : 0) | (e.bush ? 1024 : 0) | (e.card ? 4096 : 0), e.w, e.wr | 0])]);
   const sp = shipPos(), cs = [];
   for (const c of world.cars.values()) if (c.dirty > 0) { c.dirty--; cs.push([c.id, r2(c.x), r2(c.y), r2(c.z), r2(c.yaw), c.drv]); }
   const head = JSON.stringify({ t: 's', ph: phase, al: ents.length, tl: teamsAlive().size, gt: r1(gameT),
@@ -583,6 +665,7 @@ setInterval(() => {
       tickStorm(dt);
       for (const b of bots) if (b.alive) botTick(b, dt);
       tickDowned(dt);
+      tickWorld(dt);
       stormAcc += dt;
       if (stormAcc >= 1) {
         stormAcc -= 1;
@@ -628,7 +711,7 @@ function onMsg(c, m) {
     case 'pos':
       if (!c.alive) return;
       c.x = num(m.x, c.x); c.y = num(m.y, c.y); c.z = num(m.z, c.z); c.yaw = num(m.yaw); c.pitch = num(m.pitch);
-      c.fl = (m.fl | 0) & 495; c.wr = Math.min(4, Math.max(0, m.wr | 0)); c.w = WCODES.has(m.w) ? m.w : 'pick';
+      c.fl = (m.fl | 0) & (495 | 2048); c.wr = Math.min(4, Math.max(0, m.wr | 0)); c.w = WCODES.has(m.w) ? m.w : 'pick';
       if (gameT > ship.dur + 2) c.fl &= ~1;
       if (c.down) c.fl &= ~(1 | 2 | 4 | 64 | 128 | 256);
       if (c.car) { const car = world.cars.get(c.car); if (car) { c.fl |= 16; car.x = c.x; car.y = c.y; car.z = c.z; car.yaw = num(m.cy); car.dirty = 2; } else c.car = null; }
@@ -672,9 +755,9 @@ function onMsg(c, m) {
     case 'build': {
       const q = m.p; if (!up || !q || (c.fl & 7) || !S.MATS[q.mat] || c.car) return;
       const p = { t: q.t, ix: q.ix | 0, iy: q.iy | 0, iz: q.iz | 0, mat: q.mat };
-      if (p.t === 'w') p.d = q.d ? 1 : 0; else if (p.t === 'r') p.rot = (q.rot | 0) & 3; else if (p.t !== 'f') return;
-      if (Math.hypot((p.ix + 0.5) * G - c.x, (p.iy + 0.5) * H - c.y, (p.iz + 0.5) * G - c.z) > 16 || world.pieces.size > 9000) return;
-      addPiece(p, true);
+      if (p.t === 'w') p.d = q.d ? 1 : 0; else if (p.t === 'r') p.rot = (q.rot | 0) & 3; else if (p.t !== 'f' && p.t !== 'c') return;
+      if (Math.hypot((p.ix + 0.5) * G - c.x, (p.iy + 0.5) * H - c.y, (p.iz + 0.5) * G - c.z) > 16 || world.pieces.size > 16000) return;
+      addPiece(p, true, true);
       break;
     }
     case 'pickup': {
@@ -683,7 +766,7 @@ function onMsg(c, m) {
       break;
     }
     case 'open': {
-      const ch = world.chests.get(m.id | 0); if (!up || !ch || ch.open || Math.hypot(ch.x - c.x, ch.y - c.y, ch.z - c.z) > 6) return;
+      const ch = world.chests.get(m.id | 0); if (!up || !ch || ch.open || (ch.k === 'd' && gameT < ch.land) || Math.hypot(ch.x - c.x, ch.y - c.y, ch.z - c.z) > 6) return;
       scatter(openChest(ch), ch.x, ch.y, ch.z, true);
       break;
     }
@@ -693,26 +776,44 @@ function onMsg(c, m) {
       c.dropped = true;
       scatter(m.items.slice(0, 14).map(cleanItem).filter(Boolean), c.x, c.y, c.z, true);
       break;
-    case 'nade':
+    case 'nade': {
+      const k = m.k === 'stink' || m.k === 'rocket' ? m.k : 'gren';
       if (!up || !Array.isArray(m.o) || !Array.isArray(m.v) || (c.fl & 7)) return;
-      c.nades = (c.nades || 0) + 1; c.lastNade = Date.now();
-      broadcastNear({ t: 'nade', id: c.id, o: m.o.slice(0, 3).map((v) => r2(num(v))), v: m.v.slice(0, 3).map((v) => r2(Math.max(-40, Math.min(40, num(v))))) }, c.x, c.z, 200, c);
-      break;
-    case 'boom': {
-      if (phase !== 'game' || !(c.nades > 0) || Date.now() - c.lastNade > 8000) return;
-      const x = num(m.x), y = num(m.y), z = num(m.z);
-      if (Math.hypot(x - c.x, z - c.z) > 80) return;
-      c.nades--;
-      broadcastNear({ t: 'boom', x, y, z }, x, z, 300, c);
-      forNear(x, z, 8, (e) => { if (!e.alive || (e.fl & 1)) return; const d = Math.hypot(e.x - x, e.y + 0.9 - y, e.z - z); if (d < 6.5) damage(e, 12 + 98 * (1 - d / 6.5), c, 'gren', false, [(e.x - x) / (d || 1) * 10, 7.5, (e.z - z) / (d || 1) * 10]); });
-      for (const p of [...world.pieces.values()]) if (Math.abs((p.ix + 0.5) * G - x) < 6 && Math.abs((p.iz + 0.5) * G - z) < 6 && Math.hypot((p.ix + 0.5) * G - x, (p.iy + 0.5) * H - y, (p.iz + 0.5) * G - z) < 5) hitPiece(p.key, 330);
-      for (const car of [...world.cars.values()]) if (Math.hypot(car.x - x, car.y - y, car.z - z) < 5) { car.hp -= 260; if (car.hp <= 0) explodeCar(car, c); }
-      for (const o of [...world.objs.values()]) if ((o.t === 'crate' || o.t === 'barrel') && Math.hypot(o.x - x, o.z - z) < 4.5) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
+      c.proj[k] = (c.proj[k] || 0) + 1; c.lastNade = Date.now();
+      broadcastNear({ t: 'nade', id: c.id, k, o: m.o.slice(0, 3).map((v) => r2(num(v))), v: m.v.slice(0, 3).map((v) => r2(Math.max(-90, Math.min(90, num(v))))) }, c.x, c.z, 260, c);
       break;
     }
+    case 'boom': {
+      const k = m.k === 'stink' || m.k === 'rocket' ? m.k : 'gren';
+      if (phase !== 'game' || !(c.proj[k] > 0) || Date.now() - c.lastNade > 12000) return;
+      const x = num(m.x), y = num(m.y), z = num(m.z);
+      if (Math.hypot(x - c.x, z - c.z) > 250) return;
+      c.proj[k]--;
+      if (k === 'stink') { world.gas.push({ x, y, z, until: gameT + 8, by: c, acc: 0 }); broadcastNear({ t: 'gas', x, y, z, d: 8 }, x, z, 300); break; }
+      const R = k === 'rocket' ? 5.5 : 6.5, D = k === 'rocket' ? 95 : 98, P = k === 'rocket' ? 600 : 330;
+      broadcastNear({ t: 'boom', x, y, z }, x, z, 320, c);
+      forNear(x, z, 8, (e) => { if (!e.alive || (e.fl & 1)) return; const d = Math.hypot(e.x - x, e.y + 0.9 - y, e.z - z); if (d < R) damage(e, 12 + D * (1 - d / R), c, k, false, [(e.x - x) / (d || 1) * 10, 7.5, (e.z - z) / (d || 1) * 10]); });
+      for (const p of [...world.pieces.values()]) if (Math.abs((p.ix + 0.5) * G - x) < 6 && Math.abs((p.iz + 0.5) * G - z) < 6 && Math.hypot((p.ix + 0.5) * G - x, (p.iy + 0.5) * H - y, (p.iz + 0.5) * G - z) < 5) hitPiece(p.key, P);
+      for (const car of [...world.cars.values()]) if (Math.hypot(car.x - x, car.y - y, car.z - z) < 5) { car.hp -= k === 'rocket' ? 400 : 260; if (car.hp <= 0) explodeCar(car, c); }
+      for (const o of [...world.objs.values()]) if ((o.t === 'crate' || o.t === 'barrel') && Math.abs(o.x - x) < 5 && Math.abs(o.z - z) < 5 && Math.hypot(o.x - x, o.z - z) < 4.5) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
+      break;
+    }
+    case 'edit': {
+      const p = world.pieces.get(String(m.k)); if (!up || !p || p.t !== 'w') return;
+      if (Math.hypot((p.ix + 0.5) * G - c.x, (p.iz + 0.5) * G - c.z) > 9) return;
+      p.v = Math.min(2, Math.max(0, m.v | 0)); broadcast({ t: 'pcv', k: p.key, v: p.v });
+      break;
+    }
+    case 'card': {
+      const cd = world.cards.get(m.id | 0); if (!up || !cd || cd.team !== c.team || c.card || Math.hypot(cd.x - c.x, cd.z - c.z) > 4) return;
+      world.cards.delete(cd.id); c.card = cd.o; broadcast({ t: 'card-', id: cd.id, by: c.id });
+      break;
+    }
+    case 'rbt': if (m.on) { if (up) startReboot(c, world.vans.find((v) => v.id === (m.id | 0))); } else stopReboot(c); break;
     case 'heal':
       if (!up) return;
-      if (m.c === 'med') c.hp = 100; else if (m.c === 'band') c.hp = Math.max(c.hp, Math.min(75, c.hp + 15));
+      if (m.c === 'chug') { c.hp = 100; c.sh = 100; } else if (m.c === 'bush') c.bush = true;
+      else if (m.c === 'med') c.hp = 100; else if (m.c === 'band') c.hp = Math.max(c.hp, Math.min(75, c.hp + 15));
       else if (m.c === 'pot') c.sh = Math.min(100, c.sh + 50); else if (m.c === 'mini') c.sh = Math.max(c.sh, Math.min(50, c.sh + 25));
       break;
     case 'enter': {
@@ -747,7 +848,7 @@ wss.on('connection', (ws) => {
   clients.set(c.id, c);
   ws.on('message', (d) => { let m; try { m = JSON.parse(d); } catch (e) { return; } if (m && typeof m === 'object') { try { onMsg(c, m); } catch (e) { console.error(e); } } });
   ws.on('close', () => {
-    try { if (c.inMatch && c.alive && phase === 'game') kill(c, null, 'quit'); stopRevive(c); releaseCar(c); } catch (e) { console.error(e); }
+    try { if (c.inMatch && c.alive && phase === 'game') kill(c, null, 'quit'); stopRevive(c); stopReboot(c); releaseCar(c); } catch (e) { console.error(e); }
     clients.delete(c.id);
     if (c.mate && c.mate.mate === c) c.mate.mate = null;
   });

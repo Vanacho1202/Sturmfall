@@ -2,45 +2,77 @@
 (function () {
   const S = {};
   const G = (S.G = 4), H = (S.H = 3.2);
-  S.R = 250;
-  S.SHIPY = 115;
+  S.R = 800;
+  S.SHIPY = 260;
+  // Orte: t = Art (city, town, farm, factory, harbor, camp, fort)
   S.POIS = [
-    { n: 'Kieselhafen', x: -140, z: -70, r: 40, l: 1 },
-    { n: 'Nebelhain', x: -40, z: -150, r: 36, l: 2 },
-    { n: 'Rostwerk', x: 110, z: -110, r: 40, l: 2 },
-    { n: 'Sonnenhof', x: 150, z: 30, r: 38, l: 3 },
-    { n: 'Turmstadt', x: 5, z: 10, r: 46, l: 2 },
-    { n: 'Moosgrund', x: -110, z: 90, r: 38, l: 2 },
-    { n: 'Kliffkante', x: 60, z: 150, r: 36, l: 3 },
+    { n: 'Turmstadt', t: 'city', x: 0, z: 0, r: 72 },
+    { n: 'Nebelhain', t: 'town', x: -120, z: -290, r: 50 },
+    { n: 'Rostwerk', t: 'factory', x: 240, z: -200, r: 55 },
+    { n: 'Sonnenhof', t: 'farm', x: 300, z: 90, r: 55 },
+    { n: 'Moosgrund', t: 'town', x: -280, z: 120, r: 50 },
+    { n: 'Eichenruh', t: 'town', x: 60, z: 300, r: 48 },
+    { n: 'Zinnenburg', t: 'fort', x: -330, z: -110, r: 46 },
+    { n: 'Kieselhafen', t: 'harbor', x: -640, z: -150, r: 50 },
+    { n: 'Weidental', t: 'farm', x: -480, z: -470, r: 55 },
+    { n: 'Funkenfeld', t: 'factory', x: 60, z: -600, r: 55 },
+    { n: 'Krähennest', t: 'camp', x: 420, z: -480, r: 36 },
+    { n: 'Ankerbucht', t: 'harbor', x: 640, z: -120, r: 50 },
+    { n: 'Glutberg', t: 'camp', x: 560, z: 310, r: 40 },
+    { n: 'Neonmarkt', t: 'city', x: 300, z: 560, r: 60 },
+    { n: 'Silberbach', t: 'town', x: -150, z: 600, r: 50 },
+    { n: 'Seeblick', t: 'town', x: -540, z: 340, r: 50 },
+    { n: 'Steinbruch', t: 'factory', x: -650, z: 110, r: 48 },
+    { n: 'Kliffkante', t: 'camp', x: 690, z: 140, r: 36 },
   ];
+  const MOUNT = [[450, -280, 36, 75], [-430, -330, 32, 65], [180, 470, 28, 55], [-120, -470, 30, 60], [-40, 160, 14, 40]];
+  const LAKES = [[-160, 150, 18, 45], [480, -20, 17, 45], [-400, 470, 18, 50], [140, -360, 15, 34]];
   const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
   S.sm = sm;
   S.poiAt = function (x, z, extra) {
-    for (const p of S.POIS) if (Math.hypot(x - p.x, z - p.z) < p.r + (extra || 0)) return p;
+    for (const p of S.POIS) { const e = p.r + (extra || 0); if (Math.abs(x - p.x) < e && Math.abs(z - p.z) < e && Math.hypot(x - p.x, z - p.z) < e) return p; }
     return null;
   };
+  function raw(x, z) {
+    let h = 8 + 4 * Math.sin(x * 0.021 + 1.3) * Math.cos(z * 0.017 - 0.4) + 2.6 * Math.sin(x * 0.047 + z * 0.031) + 1.3 * Math.cos(x * 0.09 - z * 0.07 + 2);
+    h += 7 * Math.sin(x * 0.0061 + 0.7) * Math.cos(z * 0.0053 - 1.1) + 4 * Math.sin(x * 0.0113 - z * 0.0091 + 2.3);
+    for (const m of MOUNT) { const dx = x - m[0], dz = z - m[1]; if (Math.abs(dx) < m[3] * 3 && Math.abs(dz) < m[3] * 3) h += m[2] * Math.exp(-(dx * dx + dz * dz) / (m[3] * m[3])); }
+    for (const l of LAKES) { const dx = x - l[0], dz = z - l[1]; if (Math.abs(dx) < l[3] * 3 && Math.abs(dz) < l[3] * 3) h -= l[2] * Math.exp(-(dx * dx + dz * dz) / (l[3] * l[3])); }
+    const d = Math.hypot(x, z), a = Math.atan2(z, x), re = S.R - 55 + 38 * Math.sin(a * 3 + 0.8) + 22 * Math.sin(a * 7 - 1.3) + 10 * Math.sin(a * 13 + 2);
+    const e = 1 - sm(re - 150, re, d);
+    return -7 + (h + 7) * e;
+  }
+  for (const p of S.POIS) p.l = Math.max(1, Math.round(raw(p.x, p.z) / H));
   S.height = function (x, z) {
-    let h = 7.5 + 4 * Math.sin(x * 0.021 + 1.3) * Math.cos(z * 0.017 - 0.4) + 2.6 * Math.sin(x * 0.047 + z * 0.031) + 1.3 * Math.cos(x * 0.09 - z * 0.07 + 2);
-    const mx = x - 75, mz = z + 25;
-    h += 19 * Math.exp(-(mx * mx + mz * mz) / 1500);
-    const lx = x + 62, lz = z - 8; h -= 7.6 * Math.exp(-(lx * lx + lz * lz) / 420);
-    const l2x = x - 105, l2z = z - 95; h -= 11.4 * Math.exp(-(l2x * l2x + l2z * l2z) / 300);
-    const d = Math.hypot(x, z);
-    const e = 1 - sm(S.R - 75, S.R - 8, d);
-    h = -5 + (h + 5) * e;
+    let h = raw(x, z);
     for (const p of S.POIS) {
-      const pd = Math.hypot(x - p.x, z - p.z);
-      if (pd < p.r + 20) { const w = 1 - sm(p.r, p.r + 20, pd); h += (p.l * H - h) * w; }
+      const dx = x - p.x, dz = z - p.z, e = p.r + 26;
+      if (Math.abs(dx) > e || Math.abs(dz) > e) continue;
+      const pd = Math.hypot(dx, dz);
+      if (pd < e) { const w = 1 - sm(p.r, e, pd); h += (p.l * H - h) * w; }
     }
     return h;
   };
-
+  // Straßen: minimaler Spannbaum zwischen den Orten plus ein paar Querverbindungen
+  S.ROADS = [];
+  {
+    const P = S.POIS, inT = [0], dist = (a, b) => Math.hypot(P[a].x - P[b].x, P[a].z - P[b].z);
+    while (inT.length < P.length) {
+      let best = null;
+      for (const a of inT) for (let b = 0; b < P.length; b++) if (!inT.includes(b) && (!best || dist(a, b) < best[2])) best = [a, b, dist(a, b)];
+      S.ROADS.push([best[0], best[1]]); inT.push(best[1]);
+    }
+    for (let a = 0; a < P.length; a++) for (let b = a + 1; b < P.length; b++) if (dist(a, b) < 300 && !S.ROADS.some((r) => (r[0] === a && r[1] === b) || (r[0] === b && r[1] === a)) && S.ROADS.length < 26) S.ROADS.push([a, b]);
+  }
   S.W = {
     ar: { n: 'Sturmgewehr', s: 'STG', dmg: 30, rate: 180, mag: 30, rel: 2.2, spread: 0.02, head: 1.5, pellets: 1, ammo: 'medium', range: [50, 110, 0.65] },
     smg: { n: 'Maschinenpistole', s: 'MP', dmg: 17, rate: 85, mag: 30, rel: 2.0, spread: 0.038, head: 1.5, pellets: 1, ammo: 'light', range: [22, 50, 0.5] },
     shotgun: { n: 'Pumpgun', s: 'PUMP', dmg: 11, rate: 950, mag: 5, rel: 3.4, spread: 0.07, head: 1.5, pellets: 9, ammo: 'shells', range: [8, 26, 0.15] },
     pistol: { n: 'Pistole', s: 'PIST', dmg: 24, rate: 240, mag: 16, rel: 1.4, spread: 0.018, head: 2, pellets: 1, ammo: 'light', range: [30, 70, 0.6] },
     sniper: { n: 'Scharfschützengewehr', s: 'SNIPER', dmg: 105, rate: 1500, mag: 1, rel: 2.6, spread: 0.06, head: 2.5, pellets: 1, ammo: 'heavy', range: [400, 500, 1] },
+    tac: { n: 'Taktische Schrotflinte', s: 'TAKTIK', dmg: 8, rate: 620, mag: 8, rel: 5.2, spread: 0.08, head: 1.6, pellets: 10, ammo: 'shells', range: [7, 22, 0.15] },
+    hunt: { n: 'Jagdgewehr', s: 'JAGD', dmg: 86, rate: 1200, mag: 1, rel: 1.7, spread: 0.004, head: 2, pellets: 1, ammo: 'heavy', range: [300, 400, 1] },
+    rpg: { n: 'Raketenwerfer', s: 'RAKETE', dmg: 0, rate: 1300, mag: 1, rel: 3.3, spread: 0.01, head: 1, pellets: 1, ammo: 'rockets', range: [500, 600, 1] },
   };
   S.RAR = [
     { n: 'Gewöhnlich', c: '#9aa0a6', m: 1 },
@@ -48,6 +80,7 @@
     { n: 'Selten', c: '#3aa0ff', m: 1.12 },
     { n: 'Episch', c: '#b04dff', m: 1.18 },
     { n: 'Legendär', c: '#ffb52e', m: 1.25 },
+    { n: 'Mythisch', c: '#ff5f3a', m: 1.33 },
   ];
   S.wdmg = function (w, r, dist, head) {
     const W = S.W[w]; if (!W) return 0;
@@ -61,38 +94,45 @@
     pot: { n: 'Schildtrank', s: 'SCHILD', t: 3.5, max: 3, col: '#2f7bff' },
     mini: { n: 'Kleiner Schildtrank', s: 'MINI', t: 1.8, max: 6, col: '#6fd3ff' },
     gren: { n: 'Granate', s: 'GRANATE', t: 0, max: 6, col: '#8fbf4a' },
+    stink: { n: 'Stinkbombe', s: 'STINK', t: 0, max: 5, col: '#b5d93a' },
+    chug: { n: 'Schildfass', s: 'FASS', t: 9, max: 1, col: '#4fa3ff' },
+    bush: { n: 'Tarnbusch', s: 'BUSCH', t: 0.6, max: 1, col: '#3fae46' },
   };
-  S.AMMO = { light: 'Leichte Munition', medium: 'Mittlere Munition', shells: 'Schrot', heavy: 'Schwere Munition' };
-  S.MATS = { wood: { n: 'Holz', hp: 150 }, stone: { n: 'Stein', hp: 300 }, metal: { n: 'Metall', hp: 450 } };
+  S.AMMO = { light: 'Leichte Munition', medium: 'Mittlere Munition', shells: 'Schrot', heavy: 'Schwere Munition', rockets: 'Raketen' };
+  S.MATS = { wood: { n: 'Holz', hp: 150, bt: 1.2 }, stone: { n: 'Stein', hp: 300, bt: 2.4 }, metal: { n: 'Metall', hp: 450, bt: 3.8 } };
   S.COST = 10;
   // Rückstoß (rec), Streuungszuwachs pro Schuss (bloom)
-  const REC = { ar: [0.011, 0.006], smg: [0.007, 0.005], shotgun: [0.05, 0], pistol: [0.016, 0.009], sniper: [0.075, 0] };
+  const REC = { ar: [0.011, 0.006], smg: [0.007, 0.005], shotgun: [0.05, 0], pistol: [0.016, 0.009], sniper: [0.075, 0], tac: [0.035, 0], hunt: [0.06, 0], rpg: [0.06, 0] };
   for (const k in REC) { S.W[k].rec = REC[k][0]; S.W[k].bloom = REC[k][1]; }
-  S.ROADS = [[0, 4], [1, 4], [2, 4], [3, 4], [5, 4], [6, 4], [0, 1], [2, 3], [5, 6]];
   S.roadDist = function (x, z) {
     let best = 1e9;
     for (const r of S.ROADS) {
       const a = S.POIS[r[0]], b = S.POIS[r[1]], dx = b.x - a.x, dz = b.z - a.z;
       const t = Math.min(1, Math.max(0, ((x - a.x) * dx + (z - a.z) * dz) / (dx * dx + dz * dz)));
-      const px = a.x + dx * t + Math.sin(t * 9 + r[0]) * 6, pz = a.z + dz * t + Math.cos(t * 7 + r[1]) * 6;
+      const px = a.x + dx * t + Math.sin(t * 9 + r[0]) * 10, pz = a.z + dz * t + Math.cos(t * 7 + r[1]) * 10;
       const d = Math.hypot(x - px, z - pz); if (d < best) best = d;
     }
     return best;
   };
   S.STORM = [
-    { wait: 80, shrink: 45, f: 0.55, dmg: 1 },
-    { wait: 45, shrink: 35, f: 0.32, dmg: 2 },
-    { wait: 35, shrink: 28, f: 0.17, dmg: 4 },
-    { wait: 25, shrink: 22, f: 0.08, dmg: 6 },
-    { wait: 15, shrink: 18, f: 0.025, dmg: 8 },
-    { wait: 10, shrink: 18, f: 0, dmg: 10 },
+    { wait: 70, shrink: 70, f: 0.5, dmg: 1 },
+    { wait: 55, shrink: 55, f: 0.3, dmg: 1 },
+    { wait: 45, shrink: 45, f: 0.17, dmg: 2 },
+    { wait: 40, shrink: 38, f: 0.095, dmg: 5 },
+    { wait: 32, shrink: 30, f: 0.05, dmg: 8 },
+    { wait: 25, shrink: 25, f: 0.024, dmg: 10 },
+    { wait: 15, shrink: 22, f: 0.01, dmg: 10 },
+    { wait: 10, shrink: 22, f: 0, dmg: 10 },
   ];
+
 
   // Bauteile: t = 'w' Wand (d: 0 entlang x, 1 entlang z), 'f' Boden, 'r' Rampe (rot 0..3)
   S.pkey = (p) => p.t + ':' + p.ix + ':' + p.iy + ':' + p.iz + (p.t === 'w' ? ':' + p.d : '');
   const B = [0, 0, 0, 0, 0, 0];
+  S.roofY = (p, x, z) => p.iy * H + 1.6 * (1 - 2 * Math.max(Math.abs((x - p.ix * G) / G - 0.5), Math.abs((z - p.iz * G) / G - 0.5)));
   S.pbox = function (p) {
-    if (p.t === 'f') { B[0] = p.ix * G; B[1] = p.iy * H - 0.12; B[2] = p.iz * G; B[3] = B[0] + G; B[4] = p.iy * H + 0.12; B[5] = B[2] + G; }
+    if (p.t === 'c') { B[0] = p.ix * G; B[1] = p.iy * H; B[2] = p.iz * G; B[3] = B[0] + G; B[4] = p.iy * H + 1.0; B[5] = B[2] + G; }
+    else if (p.t === 'f') { B[0] = p.ix * G; B[1] = p.iy * H - 0.12; B[2] = p.iz * G; B[3] = B[0] + G; B[4] = p.iy * H + 0.12; B[5] = B[2] + G; }
     else if (p.d === 0) { B[0] = p.ix * G; B[1] = p.iy * H; B[2] = p.iz * G - 0.12; B[3] = B[0] + G; B[4] = B[1] + H; B[5] = p.iz * G + 0.12; }
     else { B[0] = p.ix * G - 0.12; B[1] = p.iy * H; B[2] = p.iz * G; B[3] = p.ix * G + 0.12; B[4] = B[1] + H; B[5] = B[2] + G; }
     return B;
@@ -118,7 +158,14 @@
     return t0;
   };
   S.rayPiece = function (p, ox, oy, oz, dx, dy, dz) {
-    if (p.t !== 'r') return S.rayBox(ox, oy, oz, dx, dy, dz, S.pbox(p));
+    if (p.t !== 'r') {
+      const t = S.rayBox(ox, oy, oz, dx, dy, dz, S.pbox(p));
+      if (t === null || p.t !== 'w' || !p.v) return t;
+      const u = (p.d === 0 ? ox + dx * t - p.ix * G : oz + dz * t - p.iz * G) / G, w = (oy + dy * t - p.iy * H) / H;
+      if (p.v === 1 && u > 0.27 && u < 0.73 && w > 0.3 && w < 0.78) return null;
+      if (p.v === 2 && u > 0.3 && u < 0.7 && w < 0.78) return null;
+      return t;
+    }
     const k = H / G; let a, b = 0, c = 0;
     if (p.rot === 0) { c = k; a = p.iy * H - p.iz * G * c; }
     else if (p.rot === 1) { b = k; a = p.iy * H - p.ix * G * b; }

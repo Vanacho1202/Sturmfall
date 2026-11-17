@@ -14,9 +14,9 @@ export function quality(touch) {
   return q === 'low' || q === 'med' || q === 'high' ? q : touch ? 'med' : 'high';
 }
 export const TIER = {
-  low: { pr: 1, shadow: 0, post: false, bloom: false, samples: 0, grass: 500, flowers: 120 },
-  med: { pr: 1.25, shadow: 1024, post: true, bloom: false, samples: 2, grass: 1800, flowers: 260 },
-  high: { pr: 1.5, shadow: 2048, post: true, bloom: true, samples: 4, grass: 5200, flowers: 700 },
+  low: { pr: 1, shadow: 0, post: false, bloom: false, samples: 0, grass: 500, flowers: 120, seg: 256, view: 330, bush: 1200 },
+  med: { pr: 1.25, shadow: 1024, post: true, bloom: false, samples: 2, grass: 1800, flowers: 260, seg: 384, view: 450, bush: 2000 },
+  high: { pr: 1.5, shadow: 2048, post: true, bloom: true, samples: 4, grass: 5200, flowers: 700, seg: 512, view: 600, bush: 3000 },
 };
 
 // ---------- Nachbearbeitung: Tonemapping, Farbabstimmung, Vignette (+ Leuchten auf Hoch)
@@ -152,9 +152,9 @@ export function terrainMaterial(tx) {
 }
 
 // ---------- Wasser: türkis im Flachen, dunkelblau in der Tiefe, Schaum an der Küste
-export function waterMaterial(heightFn, normalMap) {
-  const N = 256, data = new Uint8Array(N * N);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = (i + 0.5) / N * 560 - 280, z = (j + 0.5) / N * 560 - 280; data[j * N + i] = Math.round(Math.min(1, Math.max(0, -heightFn(x, z) / 8)) * 255); }
+export function waterMaterial(heightFn, normalMap, E = 280) {
+  const N = 384, data = new Uint8Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = (i + 0.5) / N * 2 * E - E, z = (j + 0.5) / N * 2 * E - E; data[j * N + i] = Math.round(Math.min(1, Math.max(0, -heightFn(x, z) / 8)) * 255); }
   const dt = new THREE.DataTexture(data, N, N, THREE.RedFormat, THREE.UnsignedByteType);
   dt.magFilter = dt.minFilter = THREE.LinearFilter; dt.needsUpdate = true;
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0, transparent: true, normalMap, normalScale: new THREE.Vector2(0.35, 0.35), envMapIntensity: 1.1 });
@@ -162,7 +162,7 @@ export function waterMaterial(heightFn, normalMap) {
     sh.uniforms.tDepth = { value: dt }; sh.uniforms.uTime = U.time;
     sh.vertexShader = 'varying vec3 vWW;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvWW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = 'uniform sampler2D tDepth; uniform float uTime; varying vec3 vWW;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      vec2 duv = (vWW.xz + 280.0) / 560.0;
+      vec2 duv = (vWW.xz + ${E.toFixed(1)}) / ${(2 * E).toFixed(1)};
       float dep = (duv.x < 0.0 || duv.x > 1.0 || duv.y < 0.0 || duv.y > 1.0) ? 8.0 : texture2D(tDepth, duv).r * 8.0;
       vec3 wc = mix(vec3(0.07, 0.52, 0.52), vec3(0.008, 0.10, 0.30), smoothstep(0.0, 5.5, dep));
       float wave = sin(uTime * 1.7 - dep * 9.0 + sin(vWW.x * 0.33) * 1.6 + cos(vWW.z * 0.29) * 1.6);

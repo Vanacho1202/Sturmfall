@@ -101,6 +101,29 @@ const WDEF = {
     box(0.02, 0.05, 0.025, { p: [0, 0.15, 0.03], c: D2 }), box(0.02, 0.05, 0.025, { p: [0, 0.15, 0.22], c: D2 }),
     box(0.01, 0.01, 0.24, { p: [-0.03, 0.014, 0.3], c: D2 }), box(0.01, 0.01, 0.24, { p: [0.03, 0.014, 0.3], c: D2 }),
   ],
+  tac: () => [
+    prof([[-0.08, 0.02], [-0.08, 0.118], [0.24, 0.118], [0.24, 0.03], [0.12, 0.02]], 0.06, D2),
+    prof([[-0.08, 0.1], [-0.08, 0.035], [-0.16, 0.02], [-0.36, -0.03], [-0.38, 0.09], [-0.2, 0.108]], 0.05, D),
+    box(0.05, 0.13, 0.016, { p: [0, 0.03, -0.39], c: D2 }),
+    prof([[-0.05, 0.03], [0.02, 0.03], [-0.01, -0.1], [-0.085, -0.085]], 0.044, D2), guard(0.02, 0.022),
+    zc(0.024, 0.024, 0.5, 0.24, 0.09, D), zc(0.03, 0.03, 0.06, 0.7, 0.09, M, 8), box(0.034, 0.03, 0.42, { p: [0, 0.046, 0.46], c: D2 }),
+    box(0.018, 0.024, 0.28, { p: [0, 0.135, 0.1], c: D }), box(0.012, 0.03, 0.08, { p: [0.032, 0.08, 0.1], c: M }),
+    ...[0, 1, 2, 3, 4].map((i) => cyl(0.012, 0.012, 0.055, 6, { p: [0.036, 0.07, -0.05 + i * 0.03], c: 0x2a6fd0 })),
+  ],
+  hunt: () => [
+    prof([[-0.5, 0.085], [-0.5, -0.04], [-0.42, -0.05], [-0.3, 0.0], [-0.1, 0.02], [0.32, 0.03], [0.32, 0.075], [-0.1, 0.09], [-0.22, 0.1], [-0.36, 0.104]], 0.05, WOOD),
+    box(0.052, 0.13, 0.018, { p: [0, 0.022, -0.505], c: D2 }),
+    prof([[-0.075, 0.03], [-0.01, 0.03], [-0.04, -0.1], [-0.105, -0.085]], 0.044, WOOD), guard(-0.01, 0.022),
+    zc(0.024, 0.024, 0.32, -0.08, 0.1, D, 10), zc(0.014, 0.017, 0.82, 0.24, 0.1, D, 8), box(0.02, 0.04, 0.02, { p: [0, 0.13, 1.03], c: D2 }),
+    cyl(0.008, 0.008, 0.07, 6, { r: [0, 0, HP], p: [0.05, 0.1, -0.02], c: SV }), sph(0.016, { p: [0.09, 0.094, -0.02], c: D2 }, 6, 5),
+    box(0.012, 0.03, 0.012, { p: [0, 0.13, 0.25], c: D2 }),
+  ],
+  rpg: () => [
+    zc(0.07, 0.07, 1.1, -0.45, 0.13, OLIVE, 14), zc(0.085, 0.07, 0.14, 0.65, 0.13, D, 14), zc(0.078, 0.09, 0.12, -0.57, 0.13, D, 14),
+    prof([[-0.055, 0.07], [0.02, 0.07], [-0.005, -0.08], [-0.08, -0.07]], 0.04, D2), guard(-0.01, 0.07),
+    prof([[0.2, 0.07], [0.26, 0.07], [0.25, -0.06], [0.2, -0.05]], 0.04, D2),
+    box(0.03, 0.09, 0.12, { p: [-0.08, 0.24, 0.12], c: D }), zc(0.025, 0.025, 0.14, 0.05, 0.3, D2, 8, -0.08),
+  ],
 };
 // bewegliche Teile (Magazin / Pumpe) als eigene Geometrie für Animationen
 const WMOVE = {
@@ -109,6 +132,9 @@ const WMOVE = {
   shotgun: () => [zc(0.034, 0.034, 0.2, 0.32, 0.046, WOOD, 8), ...[0.35, 0.4, 0.45].map((u) => zc(0.036, 0.036, 0.012, u, 0.046, D2, 8))],
   pistol: () => [box(0.03, 0.016, 0.064, { r: [-0.14, 0, 0], p: [0, -0.107, -0.04], c: M })],
   sniper: () => [prof([[0.05, 0.025], [0.15, 0.025], [0.15, -0.03], [0.06, -0.03]], 0.036, D2)],
+  tac: () => [box(0.04, 0.14, 0.07, { r: [-0.1, 0, 0], p: [0, -0.05, 0.14], c: D2 })],
+  hunt: () => [box(0.012, 0.03, 0.05, { p: [0.03, 0.1, -0.02], c: SV })],
+  rpg: () => [cone(0.065, 0.2, 10, { r: [HP, 0, 0], p: [0, 0.13, 0.82], c: 0x6f7d4a }), zc(0.04, 0.05, 0.12, 0.62, 0.13, 0x6f7d4a, 10)],
 };
 const WACC = {
   ar: () => [box(0.03, 0.04, 0.006, { p: [0, 0.165, 0.1], c: WH }), box(0.06, 0.014, 0.24, { p: [0, 0.058, 0.41], c: WH }), box(0.05, 0.012, 0.12, { p: [0, 0.1, -0.3], c: WH })],
@@ -116,9 +142,12 @@ const WACC = {
   shotgun: () => [box(0.057, 0.03, 0.16, { p: [0, 0.058, 0.07], c: WH }), zc(0.024, 0.024, 0.016, 0.76, 0.09, WH, 10)],
   pistol: () => [box(0.037, 0.012, 0.15, { p: [0, 0.074, 0.06], c: WH })],
   sniper: () => [zc(0.038, 0.038, 0.012, 0.404, 0.185, WH, 12), box(0.053, 0.014, 0.3, { p: [0, 0.056, 0.14], c: WH }), zc(0.031, 0.031, 0.01, -0.105, 0.185, WH, 10)],
+  tac: () => [box(0.062, 0.02, 0.3, { p: [0, 0.07, 0.04], c: WH }), zc(0.032, 0.032, 0.014, 0.66, 0.09, WH, 10)],
+  hunt: () => [box(0.052, 0.014, 0.36, { p: [0, 0.06, 0.08], c: WH }), zc(0.018, 0.018, 0.02, 1.0, 0.1, WH, 8)],
+  rpg: () => [zc(0.073, 0.073, 0.05, 0.2, 0.13, WH, 14), zc(0.073, 0.073, 0.05, -0.3, 0.13, WH, 14)],
 };
-export const MUZZLE = { ar: 0.82, smg: 0.45, shotgun: 0.82, pistol: 0.2, sniper: 1.08 };
-export const RARMAT = ['#9aa0a6', '#3ecf4a', '#3aa0ff', '#b04dff', '#ffb52e'].map((c) => new THREE.MeshStandardMaterial({ vertexColors: true, color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.2 }));
+export const MUZZLE = { ar: 0.82, smg: 0.45, shotgun: 0.82, pistol: 0.2, sniper: 1.08, tac: 0.76, hunt: 1.06, rpg: 0.8 };
+export const RARMAT = ['#9aa0a6', '#3ecf4a', '#3aa0ff', '#b04dff', '#ffb52e', '#ff5f3a'].map((c) => new THREE.MeshStandardMaterial({ vertexColors: true, color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.2 }));
 const wcache = {};
 export function weaponGeo(w) { return wcache[w] || (wcache[w] = { main: merge(WDEF[w]()), move: merge(WMOVE[w]()), acc: merge(WACC[w]()) }); }
 export function weaponModel(w, r) {
@@ -146,9 +175,12 @@ export function itemGeo(i) {
     if (i.c === 'med') l = [box(0.46, 0.3, 0.3, { p: [0, 0.15, 0], c: 0xe23b2e }), box(0.2, 0.06, 0.02, { p: [0, 0.16, 0.155], c: 0xffffff }), box(0.06, 0.2, 0.02, { p: [0, 0.16, 0.155], c: 0xffffff }), box(0.2, 0.03, 0.06, { p: [0, 0.33, 0], c: 0xf2f2f2 })];
     else if (i.c === 'band') l = [cyl(0.16, 0.16, 0.2, 14, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0xf4f1e6 }), cyl(0.165, 0.165, 0.05, 14, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0xe23b2e }), cyl(0.05, 0.05, 0.21, 8, { r: [HP, 0, 0], p: [0, 0.16, 0], c: 0x9a8f7a })];
     else if (i.c === 'gren') l = [sph(0.15, { s: [1, 1.15, 1], p: [0, 0.18, 0], c: 0x4f6b2f }, 10, 8), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.18, 0], c: 0x3a4f22 }), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.26, 0], c: 0x3a4f22 }), cyl(0.155, 0.155, 0.03, 10, { p: [0, 0.1, 0], c: 0x3a4f22 }), cyl(0.05, 0.05, 0.08, 8, { p: [0, 0.38, 0], c: 0x9aa3ad }), box(0.03, 0.2, 0.05, { r: [0, 0, -0.35], p: [0.09, 0.33, 0], c: 0x9aa3ad }), cyl(0.045, 0.045, 0.012, 8, { r: [HP, 0, 0], p: [-0.07, 0.4, 0], c: 0xffc83a })];
+    else if (i.c === 'stink') l = [sph(0.15, { p: [0, 0.17, 0], c: 0x8faa2a }, 10, 8), cyl(0.06, 0.07, 0.08, 8, { p: [0, 0.33, 0], c: 0x5a4a2a }), cyl(0.02, 0.02, 0.1, 6, { p: [0, 0.42, 0], c: 0xd8d0b0 }), sph(0.05, { p: [0.08, 0.26, 0.09], c: 0xb5d93a }, 6, 5), sph(0.04, { p: [-0.1, 0.2, 0.06], c: 0xb5d93a }, 6, 5)];
+    else if (i.c === 'chug') l = [cyl(0.26, 0.26, 0.5, 14, { p: [0, 0.25, 0], c: 0x2f6fd0 }), cyl(0.27, 0.27, 0.05, 14, { p: [0, 0.08, 0], c: 0x9aa3ad }), cyl(0.27, 0.27, 0.05, 14, { p: [0, 0.42, 0], c: 0x9aa3ad }), cyl(0.08, 0.08, 0.08, 8, { p: [0, 0.54, 0], c: 0xdfeaf5 }), box(0.3, 0.16, 0.02, { p: [0, 0.27, 0.262], c: 0x8fd0ff })];
+    else if (i.c === 'bush') l = [ico(0.26, 1, { p: [0, 0.26, 0], c: 0x3a8f3a, flat: 1 }), ico(0.18, 1, { p: [0.15, 0.36, 0.05], c: 0x4fae46, flat: 1 }), ico(0.16, 1, { p: [-0.14, 0.34, -0.06], c: 0x3f9a3f, flat: 1 }), box(0.06, 0.08, 0.06, { p: [0, 0.03, 0], c: 0x6b4526 })];
     else { const s = i.c === 'pot' ? 1 : 0.7, c = i.c === 'pot' ? 0x2f7bff : 0x6fd3ff; l = [cyl(0.16 * s, 0.18 * s, 0.3 * s, 12, { p: [0, 0.15 * s, 0], c }), cone(0.16 * s, 0.14 * s, 12, { p: [0, 0.37 * s, 0], c }), cyl(0.06 * s, 0.06 * s, 0.1 * s, 8, { p: [0, 0.46 * s, 0], c: 0xdfeaf5 }), cyl(0.07 * s, 0.07 * s, 0.05 * s, 8, { p: [0, 0.53 * s, 0], c: 0x8a5a2b })]; }
   } else if (i.k === 'a') {
-    const c = { light: 0xd0b24a, medium: 0x5f7d3a, shells: 0xc23b2e, heavy: 0x3a4a6b }[i.a];
+    const c = { light: 0xd0b24a, medium: 0x5f7d3a, shells: 0xc23b2e, heavy: 0x3a4a6b, rockets: 0x6f7d4a }[i.a];
     l = [box(0.36, 0.2, 0.24, { p: [0, 0.1, 0], c }), box(0.38, 0.05, 0.26, { p: [0, 0.21, 0], c: 0x2a2d33 })];
     for (let n = -1; n <= 1; n++) l.push(cyl(0.03, 0.03, 0.12, 6, { p: [n * 0.09, 0.29, 0], c: 0xe0b23c }));
   } else if (i.m === 'wood') l = [box(0.5, 0.07, 0.14, { p: [0, 0.05, -0.08], c: 0xb9824a }), box(0.5, 0.07, 0.14, { p: [0, 0.05, 0.08], c: 0xa87238 }), box(0.5, 0.07, 0.14, { r: [0, 0.3, 0], p: [0, 0.13, 0], c: 0xc48f55 })];
@@ -165,6 +197,36 @@ export function chestModel() {
   g.add(base, lid);
   return { g, lid };
 }
+// Munitionskiste (flach, grün, Deckel klappt auf)
+export function ammoBoxModel() {
+  const g = new THREE.Group();
+  const base = mesh([box(1.0, 0.38, 0.55, { p: [0, 0.19, 0], c: 0x4d5c3c }), box(1.04, 0.06, 0.59, { p: [0, 0.06, 0], c: 0x2f3a26 }), box(0.18, 0.12, 0.04, { p: [-0.3, 0.22, 0.29], c: 0xe0b23c }), box(0.18, 0.12, 0.04, { p: [0.3, 0.22, 0.29], c: 0xe0b23c })]);
+  const lid = new THREE.Mesh(merge([box(1.04, 0.1, 0.59, { p: [0, 0.05, 0.295], c: 0x5a6b46 }), box(0.3, 0.04, 0.2, { p: [0, 0.11, 0.3], c: 0xd0b24a })]), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0x88aa44, emissiveIntensity: 0.35, roughness: 0.6 }));
+  lid.position.set(0, 0.38, -0.295); lid.castShadow = true; g.add(base, lid);
+  return { g, lid };
+}
+// Versorgungskiste mit Ballon
+export function dropModel() {
+  const g = new THREE.Group();
+  const base = mesh([box(1.5, 1.1, 1.5, { p: [0, 0.55, 0], c: 0x2f6fd0 }), box(1.56, 0.12, 1.56, { p: [0, 0.06, 0], c: 0x1d3f7a }), box(1.56, 0.12, 1.56, { p: [0, 1.04, 0], c: 0x1d3f7a }),
+    ...[[-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7], [0.7, 0.7]].map(([x, z]) => box(0.14, 1.12, 0.14, { p: [x, 0.56, z], c: 0xffc83a })), box(0.6, 0.6, 0.02, { p: [0, 0.6, 0.76], c: 0xffffff }), box(0.12, 0.4, 0.03, { p: [0, 0.6, 0.77], c: 0x2f6fd0 }), box(0.4, 0.12, 0.03, { p: [0, 0.6, 0.77], c: 0x2f6fd0 })]);
+  const lid = new THREE.Mesh(merge([box(1.5, 0.14, 1.5, { p: [0, 0.07, 0.75], c: 0x3a86ff })]), new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0x3a86ff, emissiveIntensity: 0.6, roughness: 0.4 }));
+  lid.position.set(0, 1.1, -0.75); lid.castShadow = true;
+  const bal = mesh([sph(1.6, { s: [1, 1.15, 1], p: [0, 7.2, 0], c: 0x3aa0ff }, 16, 12), sph(1.62, { s: [1, 1.15, 1], p: [0, 7.2, 0], c: 0xffffff }, 16, 12, 0.5), ...[[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]].map(([x, z]) => cyl(0.02, 0.02, 4.6, 4, { r: [x > 0 ? -0.18 : 0.18, 0, 0], p: [x * 0.6, 3.6, z * 0.6], c: 0xdddddd }))], false);
+  const light = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 140, 8, 1, true).translate(0, 70, 0), new THREE.MeshBasicMaterial({ color: 0x59b7ff, transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  g.add(base, lid, bal, light);
+  return { g, lid, bal, light };
+}
+// Reboot-Station (eigenes Design: Funkmast mit Lichtring)
+export function vanModel() {
+  return mesh([box(3.2, 1.9, 1.8, { p: [0, 0.95, 0], c: 0xe8e4da }), box(3.24, 0.4, 1.84, { p: [0, 0.4, 0], c: 0x2f7bd0 }), box(1.0, 1.0, 1.84, { p: [1.25, 1.5, 0], c: 0x7fb8e6 }),
+    ...[[-1.1, 0.95], [1.1, 0.95], [-1.1, -0.95], [1.1, -0.95]].map(([x, z]) => cyl(0.36, 0.36, 0.3, 12, { r: [HP, 0, 0], p: [x, 0.36, z], c: 0x1a1c20 })),
+    cyl(0.06, 0.06, 2.6, 6, { p: [-0.8, 3.2, 0], c: 0x9aa3ad }), sph(0.22, { p: [-0.8, 4.55, 0], c: 0x59b7ff }, 10, 8), box(1.6, 0.08, 1.2, { p: [-0.6, 1.95, 0], c: 0x2f7bd0 }),
+    cyl(0.5, 0.5, 0.06, 16, { r: [0, 0, 0.6], p: [-0.2, 2.3, 0], c: 0xdfe6ee })]);
+}
+export const cardGeo = merge([box(0.5, 0.7, 0.04, { c: 0x59b7ff }), box(0.38, 0.12, 0.05, { p: [0, 0.18, 0], c: 0xffffff }), box(0.12, 0.3, 0.05, { p: [-0.08, -0.12, 0], c: 0xffd83a })]);
+export const rocketGeo = merge([cyl(0.07, 0.07, 0.5, 8, { r: [HP, 0, 0], c: 0x6f7d4a }), cone(0.07, 0.2, 8, { r: [HP, 0, 0], p: [0, 0, 0.35], c: 0xd0392e }), box(0.3, 0.02, 0.1, { p: [0, 0, -0.2], c: 0x2a2d33 }), box(0.02, 0.3, 0.1, { p: [0, 0, -0.2], c: 0x2a2d33 })]);
+export const bushGeo = merge([ico(0.9, 1, { s: [1, 0.9, 1], p: [0, 0.75, 0], c: 0x3f8f36, flat: 1 }), ico(0.65, 1, { p: [0.45, 1.25, 0.15], c: 0x4fa640, flat: 1 }), ico(0.6, 1, { p: [-0.45, 1.15, -0.1], c: 0x3a8532, flat: 1 }), ico(0.55, 1, { p: [0.05, 1.55, -0.2], c: 0x5bb44a, flat: 1 })]);
 
 // ================= Figur (mit Ellbogen, Knien und beweglichem Kopf) =================
 export const BPGEO = merge([box(0.34, 0.02, 0.44, { p: [0, 0, 0.1], c: 0x8fd0ff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.2], c: 0xffffff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.08], c: 0xffffff }), box(0.03, 0.022, 0.3, { p: [-0.1, 0, 0.1], c: 0xffffff })]);
@@ -303,7 +365,7 @@ export const streakGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0, 0.5);
 
 // ================= Himmel / Wolken =================
 export function makeSky(sunDir) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(1300, 24, 14), new THREE.ShaderMaterial({
+  const m = new THREE.Mesh(new THREE.SphereGeometry(2600, 24, 14), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { sun: { value: sunDir } },
     vertexShader: 'varying vec3 vp; void main(){ vp=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: 'varying vec3 vp; uniform vec3 sun; void main(){ vec3 d=normalize(vp); float h=max(d.y,0.0); vec3 c=mix(vec3(0.52,0.74,0.95),vec3(0.07,0.25,0.68),pow(h,0.6)); float s=max(dot(d,sun),0.0); c+=vec3(1.0,0.85,0.55)*pow(s,350.0)*2.0+vec3(1.0,0.75,0.45)*pow(s,10.0)*0.18; gl_FragColor=vec4(c,1.0);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}',
@@ -315,7 +377,7 @@ export function makeClouds(n) {
   const geo = merge([ico(1, 1, { s: [1.6, 0.55, 1], c: 0xffffff, flat: 1 }), ico(0.8, 1, { s: [1.3, 0.6, 1], p: [1.3, 0.1, 0.3], c: 0xf4f8ff, flat: 1 }), ico(0.7, 1, { s: [1.2, 0.55, 1], p: [-1.3, 0.05, -0.2], c: 0xeef4ff, flat: 1 }), ico(0.6, 1, { p: [0.2, 0.35, -0.3], c: 0xffffff, flat: 1 })]);
   const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.25, 1.25, 1.3), fog: false, transparent: true, opacity: 0.95 }), n);
   const list = [];
-  for (let i = 0; i < n; i++) list.push({ x: (Math.random() - 0.5) * 1500, y: 190 + Math.random() * 90, z: (Math.random() - 0.5) * 1500, s: 14 + Math.random() * 22, r: Math.random() * 6.28 });
+  for (let i = 0; i < n; i++) list.push({ x: (Math.random() - 0.5) * 2600, y: 230 + Math.random() * 110, z: (Math.random() - 0.5) * 2600, s: 18 + Math.random() * 30, r: Math.random() * 6.28 });
   im.frustumCulled = false; im.userData.list = list;
   return im;
 }
@@ -342,9 +404,14 @@ const DRAW = {
 export function pieceMaterials() {
   const out = {};
   const P = { wood: [0.8, 0], stone: [0.9, 0], metal: [0.45, 0.55] };
-  for (const k in DRAW) out[k] = [0, 1].map((w) => {
-    const map = tex((g) => { DRAW[k](g); if (w) win(g, k === 'wood' ? '#5a3a1a' : k === 'stone' ? '#e8e4da' : '#2c3945'); });
-    return new THREE.MeshStandardMaterial({ map, normalMap: normalFromCanvas(map.image, k === 'metal' ? 2 : 4), roughness: P[k][0], metalness: P[k][1] });
+  for (const k in DRAW) out[k] = [0, 1, 2].map((w) => {
+    const fr = k === 'wood' ? '#5a3a1a' : k === 'stone' ? '#e8e4da' : '#2c3945';
+    const map = tex((g) => {
+      DRAW[k](g);
+      if (w === 1) { g.fillStyle = fr; g.fillRect(64, 50, 128, 132); g.clearRect(74, 60, 108, 112); }
+      if (w === 2) { g.fillStyle = fr; g.fillRect(70, 48, 116, 208); g.clearRect(80, 58, 96, 198); }
+    });
+    return new THREE.MeshStandardMaterial({ map, normalMap: normalFromCanvas(map.image, k === 'metal' ? 2 : 4), roughness: P[k][0], metalness: P[k][1], alphaTest: w ? 0.5 : 0, side: w ? THREE.DoubleSide : THREE.FrontSide });
   });
   return out;
 }
