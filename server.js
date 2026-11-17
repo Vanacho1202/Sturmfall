@@ -711,7 +711,7 @@ function onMsg(c, m) {
     case 'pos':
       if (!c.alive) return;
       c.x = num(m.x, c.x); c.y = num(m.y, c.y); c.z = num(m.z, c.z); c.yaw = num(m.yaw); c.pitch = num(m.pitch);
-      c.fl = (m.fl | 0) & (495 | 2048); c.wr = Math.min(4, Math.max(0, m.wr | 0)); c.w = WCODES.has(m.w) ? m.w : 'pick';
+      c.fl = (m.fl | 0) & (495 | 2048 | 8192 | 16384 | 32768); c.wr = Math.min(5, Math.max(0, m.wr | 0)); c.w = WCODES.has(m.w) ? m.w : 'pick';
       if (gameT > ship.dur + 2) c.fl &= ~1;
       if (c.down) c.fl &= ~(1 | 2 | 4 | 64 | 128 | 256);
       if (c.car) { const car = world.cars.get(c.car); if (car) { c.fl |= 16; car.x = c.x; car.y = c.y; car.z = c.z; car.yaw = num(m.cy); car.dirty = 2; } else c.car = null; }
