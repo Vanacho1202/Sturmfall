@@ -738,7 +738,6 @@ function onMsg(m) {
     case 'roster': setRoster(m.r); break;
     case 'knock': {
       const v = esc(nameOf(m.v)), k = m.k ? esc(nameOf(m.k)) : '', ic = S.W[m.w] ? pic(m.w + '0', ICON[m.w]) : m.w === 'gren' ? pic('gren', ICON.gren) : m.w === 'pick' ? pic('pick', ICON.pick) : ' ⟶ ';
-      feed((k ? '<b>' + k + '</b>' + ic : '') + '<b>' + v + '</b> <span style="color:#ffb347">niedergeschlagen</span>', m.k === myId || m.v === myId);
       if (m.k === myId) { $('elim').innerHTML = '⬇ NIEDERGESCHLAGEN &nbsp;<b>' + v + '</b>'; $('elim').style.opacity = 1; elimT = 2.2; hitMarker('kill'); tone(520, 780, 0.15, 0.12, 'triangle'); }
       if (m.v === myId) meKnocked();
       if (m.v === mateId) { banner(nameOf(mateId) + ' liegt am Boden – hilf!', 3); tone(400, 260, 0.3, 0.12, 'sawtooth'); }
@@ -749,7 +748,7 @@ function onMsg(m) {
       if (m.v === myId || m.by === myId) revState = m.on ? { v: m.v, by: m.by, t0: performance.now() } : null;
       break;
     case 'revd':
-      revivers.delete(m.by); feed('<b>' + esc(nameOf(m.by)) + '</b> hat <b>' + esc(nameOf(m.v)) + '</b> wiederbelebt', m.v === myId || m.by === myId);
+      revivers.delete(m.by);
       if (revState && (revState.v === m.v || revState.by === m.by)) revState = null;
       if (m.v === myId) { me.down = false; document.body.classList.remove('down'); banner('Wiederbelebt!', 2); tone(500, 1000, 0.35, 0.15, 'sine'); hudDirty = true; }
       if (m.by === myId) { banner(nameOf(m.v) + ' ist wieder auf den Beinen', 2); tone(500, 1000, 0.35, 0.15, 'sine'); }
@@ -760,7 +759,7 @@ function onMsg(m) {
       const ic = S.W[m.w] ? pic(m.w + '0', ICON[m.w]) : m.w === 'pick' ? pic('pick', ICON.pick) : m.w === 'gren' ? pic('gren', ICON.gren) : ICON[m.w === 'car' ? 'car' : 'storm'];
       const ve = m.v === myId ? me : ents.get(m.v), ke = m.k === myId ? me : ents.get(m.k);
       const dist = ve && ke && m.k ? ' <span style="opacity:.6">' + Math.round(Math.hypot(ve.x - ke.x, ve.z - ke.z)) + ' m</span>' : '';
-      feed(m.w === 'bleed' ? '<b>' + v + '</b> wurde ausgeschaltet' + (k ? ' von <b>' + k + '</b>' : '') : m.w === 'storm' ? ic + '<b>' + v + '</b> wurde vom Sturm erwischt' : m.w === 'fall' ? '<b>' + v + '</b> ist zu tief gefallen' : m.w === 'quit' ? '<b>' + v + '</b> hat das Spiel verlassen' : !m.k ? '<b>' + v + '</b> wurde eliminiert' : '<b>' + k + '</b>' + ic + '<b>' + v + '</b>' + dist, m.k === myId || m.v === myId);
+      feed(m.w === 'bleed' ? (k ? '<b>' + k + '</b> ⟶ ' : '') + '<b>' + v + '</b>' : m.w === 'storm' ? ic + '<b>' + v + '</b> wurde vom Sturm erwischt' : m.w === 'fall' ? '<b>' + v + '</b> ist zu tief gefallen' : m.w === 'quit' ? '<b>' + v + '</b> hat das Spiel verlassen' : !m.k ? '<b>' + v + '</b> wurde eliminiert' : '<b>' + k + '</b>' + ic + '<b>' + v + '</b>' + dist, m.k === myId || m.v === myId);
       deadSet.add(m.v); if (m.k) killsBy.set(m.k, m.kills);
       if (m.k === myId) { me.kills = m.kills; $('elim').innerHTML = '☠ ELIMINIERT &nbsp;<b>' + v + '</b>'; $('elim').style.opacity = 1; elimT = 2.6; hitMarker('kill'); tone(660, 990, 0.18, 0.14, 'triangle'); }
       { const ve2 = ents.get(m.v); if (ve2) { ve2.deadT = 1; ve2.alive = false; } } revivers.delete(m.v);
