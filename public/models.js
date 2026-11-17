@@ -1,7 +1,10 @@
 // Eigene, prozedural gebaute Modelle für Sturmfall
 import * as THREE from './lib/three.module.js';
+import { normalFromCanvas } from './gfx.js';
 const _c = new THREE.Color();
-export const VM = new THREE.MeshLambertMaterial({ vertexColors: true });
+export const VM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 });
+export const WM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.35 });
+export const CARM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.25 });
 
 function mk(geo, o) {
   if (o.s) geo.scale(o.s[0], o.s[1], o.s[2]);
@@ -30,7 +33,7 @@ export function merge(list) {
   m.setAttribute('position', new THREE.BufferAttribute(pos, 3)); m.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); m.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return m;
 }
-const mesh = (list, shadow = true) => { const m = new THREE.Mesh(merge(list), VM); m.castShadow = shadow; return m; };
+const mesh = (list, shadow = true, mat = VM) => { const m = new THREE.Mesh(merge(list), mat); m.castShadow = shadow; return m; };
 const hsl = (h, s, l) => new THREE.Color().setHSL((((h % 360) + 360) % 360) / 360, s, l);
 const HP = Math.PI / 2;
 
@@ -115,12 +118,12 @@ const WACC = {
   sniper: () => [zc(0.038, 0.038, 0.012, 0.404, 0.185, WH, 12), box(0.053, 0.014, 0.3, { p: [0, 0.056, 0.14], c: WH }), zc(0.031, 0.031, 0.01, -0.105, 0.185, WH, 10)],
 };
 export const MUZZLE = { ar: 0.82, smg: 0.45, shotgun: 0.82, pistol: 0.2, sniper: 1.08 };
-export const RARMAT = ['#9aa0a6', '#3ecf4a', '#3aa0ff', '#b04dff', '#ffb52e'].map((c) => new THREE.MeshLambertMaterial({ vertexColors: true, color: c, emissive: c, emissiveIntensity: 0.45 }));
+export const RARMAT = ['#9aa0a6', '#3ecf4a', '#3aa0ff', '#b04dff', '#ffb52e'].map((c) => new THREE.MeshStandardMaterial({ vertexColors: true, color: c, emissive: c, emissiveIntensity: 0.9, roughness: 0.35, metalness: 0.2 }));
 const wcache = {};
 export function weaponGeo(w) { return wcache[w] || (wcache[w] = { main: merge(WDEF[w]()), move: merge(WMOVE[w]()), acc: merge(WACC[w]()) }); }
 export function weaponModel(w, r) {
   const g = new THREE.Group(), geo = weaponGeo(w);
-  const a = new THREE.Mesh(geo.main, VM), b = new THREE.Mesh(geo.move, VM), c = new THREE.Mesh(geo.acc, RARMAT[r | 0]); a.castShadow = b.castShadow = true; g.add(a, b, c);
+  const a = new THREE.Mesh(geo.main, WM), b = new THREE.Mesh(geo.move, WM), c = new THREE.Mesh(geo.acc, RARMAT[r | 0]); a.castShadow = b.castShadow = true; g.add(a, b, c);
   return g;
 }
 let pickGeo = null;
@@ -157,7 +160,7 @@ export function chestModel() {
   const g = new THREE.Group();
   const base = mesh([box(1.2, 0.55, 0.8, { p: [0, 0.28, 0], c: 0x7a4a22 }), box(1.24, 0.08, 0.84, { p: [0, 0.52, 0], c: 0xe0a92e }), box(0.1, 0.56, 0.84, { p: [-0.45, 0.28, 0], c: 0xe0a92e }), box(0.1, 0.56, 0.84, { p: [0.45, 0.28, 0], c: 0xe0a92e })]);
   const lid = new THREE.Mesh(merge([cyl(0.4, 0.4, 1.2, 12, { r: [0, 0, HP], s: [1, 0.75, 1], p: [0, 0, 0.4], c: 0x8a5526 }), cyl(0.415, 0.415, 0.1, 12, { r: [0, 0, HP], s: [1, 0.75, 1], p: [-0.45, 0, 0.4], c: 0xffc83a }), cyl(0.415, 0.415, 0.1, 12, { r: [0, 0, HP], s: [1, 0.75, 1], p: [0.45, 0, 0.4], c: 0xffc83a }), box(0.16, 0.2, 0.06, { p: [0, 0, 0.82], c: 0xffe27a })]),
-    new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xffa500, emissiveIntensity: 0.45 }));
+    new THREE.MeshStandardMaterial({ vertexColors: true, emissive: 0xffa500, emissiveIntensity: 0.8, roughness: 0.35, metalness: 0.5 }));
   lid.position.set(0, 0.56, -0.4); lid.castShadow = true;
   g.add(base, lid);
   return { g, lid };
@@ -165,6 +168,7 @@ export function chestModel() {
 
 // ================= Figur (mit Ellbogen, Knien und beweglichem Kopf) =================
 export const BPGEO = merge([box(0.34, 0.02, 0.44, { p: [0, 0, 0.1], c: 0x8fd0ff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.2], c: 0xffffff }), box(0.26, 0.022, 0.03, { p: [0, 0, 0.08], c: 0xffffff }), box(0.03, 0.022, 0.3, { p: [-0.1, 0, 0.1], c: 0xffffff })]);
+const FLASHM = new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 2.8, 1.1), transparent: true, opacity: 0.95, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
 export function makeChar(hue, style) {
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
   const c1 = hsl(hue, 0.72, 0.5), c1d = hsl(hue, 0.65, 0.36), c2 = hsl(hue + 25, 0.42, 0.2), c3 = hsl(hue + 170, 0.85, 0.58);
@@ -203,8 +207,8 @@ export function makeChar(hue, style) {
   const lL = limb(lUp, lLow, -0.13, 0.78, 0.38, g), lR = limb(lUp, lLow, 0.13, 0.78, 0.38, g);
   const gun = new THREE.Group(); gun.rotation.x = HP; gun.position.set(0, -0.33, 0.07);
   const wg = weaponGeo('ar');
-  const gunMain = add(wg.main, gun), gunMove = add(wg.move, gun), gunAcc = new THREE.Mesh(wg.acc, RARMAT[0]); gun.add(gunAcc);
-  const flash = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 6).rotateX(HP), new THREE.MeshBasicMaterial({ color: 0xffd76a, transparent: true, opacity: 0.95, fog: false })); flash.visible = false; gun.add(flash);
+  const gunMain = add(wg.main, gun), gunMove = add(wg.move, gun); gunMain.material = gunMove.material = WM; const gunAcc = new THREE.Mesh(wg.acc, RARMAT[0]); gun.add(gunAcc);
+  const flash = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.46, 6).rotateX(HP), FLASHM); flash.visible = false; gun.add(flash);
   aR.low.add(gun);
   const pick = add(pickaxeGeo(), aR.low); pick.position.set(0, -0.33, 0);
   const held = add(BPGEO, aR.low); held.position.set(0, -0.42, 0.06); held.visible = false;
@@ -252,7 +256,7 @@ export function carModel(v, hue) {
       box(1.94, 0.1, 0.9, { p: [0, 0.62, 1.4], c: G }), box(1.94, 0.1, 0.9, { p: [0, 0.62, -1.4], c: G }), box(1.7, 0.06, 0.06, { p: [0, 2.0, -0.3], c: 0xffc83a })];
   }
   const g = new THREE.Group(); g.rotation.order = 'YXZ';
-  const body = mesh(l); body.receiveShadow = true; g.add(body);
+  const body = mesh(l, true, CARM); body.receiveShadow = true; g.add(body);
   if (!wheelGeo) wheelGeo = merge([cyl(0.48, 0.48, 0.36, 14, { r: [0, 0, HP], c: 0x17181b }), cyl(0.26, 0.26, 0.38, 8, { r: [0, 0, HP], c: 0xb9c2cc }), cyl(0.1, 0.1, 0.4, 6, { r: [0, 0, HP], c: 0x555b63 })]);
   const wheels = [];
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(wheelGeo, VM); w.castShadow = true; w.position.set(sx * wx, wy, sz * wz); w.scale.setScalar(wy / 0.48); g.add(w); wheels.push(w); }
@@ -309,7 +313,7 @@ export function makeSky(sunDir) {
 }
 export function makeClouds(n) {
   const geo = merge([ico(1, 1, { s: [1.6, 0.55, 1], c: 0xffffff, flat: 1 }), ico(0.8, 1, { s: [1.3, 0.6, 1], p: [1.3, 0.1, 0.3], c: 0xf4f8ff, flat: 1 }), ico(0.7, 1, { s: [1.2, 0.55, 1], p: [-1.3, 0.05, -0.2], c: 0xeef4ff, flat: 1 }), ico(0.6, 1, { p: [0.2, 0.35, -0.3], c: 0xffffff, flat: 1 })]);
-  const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0.93 }), n);
+  const im = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.25, 1.25, 1.3), fog: false, transparent: true, opacity: 0.95 }), n);
   const list = [];
   for (let i = 0; i < n; i++) list.push({ x: (Math.random() - 0.5) * 1500, y: 190 + Math.random() * 90, z: (Math.random() - 0.5) * 1500, s: 14 + Math.random() * 22, r: Math.random() * 6.28 });
   im.frustumCulled = false; im.userData.list = list;
@@ -317,27 +321,6 @@ export function makeClouds(n) {
 }
 
 // ================= Partikel =================
-export class Particles {
-  constructor(scene, n = 360) {
-    this.n = n; this.list = []; this.d = new THREE.Object3D();
-    this.im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ fog: false }), n);
-    this.im.frustumCulled = false; this.im.count = 0; this.im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    for (let i = 0; i < n; i++) this.im.setColorAt(i, _c.set(0xffffff));
-    scene.add(this.im);
-  }
-  burst(x, y, z, color, n, speed = 4, size = 0.09, life = 0.6, grav = 12, bounce = false) {
-    for (let i = 0; i < n && this.list.length < this.n; i++) {
-      const a = Math.random() * 6.283, u = Math.random() * 2 - 1, q = Math.sqrt(1 - u * u), sp = speed * (0.4 + Math.random() * 0.8);
-      this.list.push({ x, y, z, vx: Math.cos(a) * q * sp, vy: u * sp + speed * 0.4, vz: Math.sin(a) * q * sp, t: life * (0.6 + Math.random() * 0.6), l: life, s: size * (0.6 + Math.random() * 0.8), c: color, g: grav, b: bounce });
-    }
-  }
-  update(dt) {
-    const L = this.list, d = this.d;
-    for (let i = L.length - 1; i >= 0; i--) { const p = L[i]; p.t -= dt; if (p.t <= 0) { L[i] = L[L.length - 1]; L.pop(); continue; } p.vy -= p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; if (p.b && this.ground) { const gh = this.ground(p.x, p.z) + p.s * 0.5; if (p.y < gh) { p.y = gh; p.vy = -p.vy * 0.4; p.vx *= 0.6; p.vz *= 0.6; } } }
-    for (let i = 0; i < L.length; i++) { const p = L[i]; d.position.set(p.x, p.y, p.z); d.scale.setScalar(p.s * Math.min(1, p.t / p.l * 2)); d.rotation.set(p.t * 5, p.t * 3, 0); d.updateMatrix(); this.im.setMatrixAt(i, d.matrix); this.im.setColorAt(i, _c.set(p.c)); }
-    this.im.count = L.length; this.im.instanceMatrix.needsUpdate = true; if (this.im.instanceColor) this.im.instanceColor.needsUpdate = true;
-  }
-}
 
 // ================= Bau-Texturen =================
 function tex(draw) {
@@ -358,7 +341,11 @@ const DRAW = {
 };
 export function pieceMaterials() {
   const out = {};
-  for (const k in DRAW) out[k] = [new THREE.MeshLambertMaterial({ map: tex(DRAW[k]) }), new THREE.MeshLambertMaterial({ map: tex((g) => { DRAW[k](g); win(g, k === 'wood' ? '#5a3a1a' : k === 'stone' ? '#e8e4da' : '#2c3945'); }) })];
+  const P = { wood: [0.8, 0], stone: [0.9, 0], metal: [0.45, 0.55] };
+  for (const k in DRAW) out[k] = [0, 1].map((w) => {
+    const map = tex((g) => { DRAW[k](g); if (w) win(g, k === 'wood' ? '#5a3a1a' : k === 'stone' ? '#e8e4da' : '#2c3945'); });
+    return new THREE.MeshStandardMaterial({ map, normalMap: normalFromCanvas(map.image, k === 'metal' ? 2 : 4), roughness: P[k][0], metalness: P[k][1] });
+  });
   return out;
 }
 export function stormTexture() {
