@@ -35,6 +35,7 @@ html,body{height:100%;overflow:hidden;position:fixed;inset:0;touch-action:none;o
 #lobbyN{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:640px;margin-top:14px}
 #lobbyN span{background:var(--glass);border:1px solid rgba(255,255,255,.2);padding:5px 14px;border-radius:20px;font-weight:700;font-size:14px}
 #dead,#win{pointer-events:none;justify-content:flex-start;padding-top:11vh;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0) 45%)}
+#dead .leave,#win .leave{pointer-events:auto;position:fixed;right:24px;bottom:24px;padding:12px 26px;font-size:18px;width:auto;min-width:0}
 #dead .big{font-size:64px;font-weight:900;font-style:italic;letter-spacing:2px;transform:skewX(-6deg);text-shadow:0 5px 0 rgba(0,0,0,.5)}
 #win .big{font-size:96px;font-weight:900;font-style:italic;letter-spacing:3px;transform:skewX(-8deg);color:var(--y);text-shadow:0 6px 0 #8a6a00,0 0 60px rgba(255,216,58,.6);animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes pop{from{transform:skewX(-8deg) scale(.3);opacity:0}to{transform:skewX(-8deg) scale(1);opacity:1}}
@@ -272,8 +273,8 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
 </div>
 <div class="ov" id="rotate">📱↻<br>Bitte das Gerät quer drehen</div>
 <div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyV"></div><div class="modes lobbym"><button data-mode="solo">SOLO</button><button data-mode="duo">DUO</button></div><div id="lobbyN"></div></div>
-<div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div></div>
-<div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div></div>
+<div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div><button class="btn leave" id="leaveD">Verlassen</button></div>
+<div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div><button class="btn leave" id="leaveW">Verlassen</button></div>
 <script type="importmap">{"imports":{"three":"/lib/three.module.js"}}</script>
 <script src="shared.js"></script>
 <script type="module" src="game.js"></script>
