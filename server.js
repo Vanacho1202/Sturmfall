@@ -5,7 +5,7 @@ const S = require('./public/shared.js');
 const G = S.G, H = S.H, SHIPY = S.SHIPY;
 const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
-const TOTAL = +process.env.TOTAL || 100, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
+const TOTAL = +process.env.TOTAL || 500, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
 const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
 const OT = ['tree', 'rock', 'crate', 'barrel', 'prop'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
@@ -715,25 +715,27 @@ function botTick(b, dt) {
     if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 5 || (storm.nr && !storm.shrink && storm.timer < 25 + b.skill * 10 && Math.hypot(b.x - storm.nx, b.z - storm.nz) > storm.nr - 8 && b.toNext !== storm.i)) { newWaypoint(b, true); b.toNext = storm.i; b.chest = null; }
     if ((!b.wpn || (b.wpn.r < 3 && !best)) && !b.chest && gameT >= b.nextChest) {
       b.nextChest = gameT + 3; let cd = b.wpn ? 32 : 75;
-      for (const ch of world.chests.values()) { if (ch.open || (ch.bot && ch.bot !== b.id) || Math.abs(ch.y - S.height(ch.x, ch.z)) > 0.5) continue; const d = Math.hypot(ch.x - b.x, ch.z - b.z); if (d < cd) { cd = d; b.chest = ch; } }
+      for (const ch of world.chests.values()) { if (ch.open || (ch.bot && ch.bot !== b.id) || Math.hypot(ch.x - (storm.nr ? storm.nx : storm.x), ch.z - (storm.nr ? storm.nz : storm.z)) > (storm.nr || storm.r) - 6 || Math.abs(ch.y - S.height(ch.x, ch.z)) > 0.5) continue; const d = Math.hypot(ch.x - b.x, ch.z - b.z); if (d < cd) { cd = d; b.chest = ch; } }
       if (b.chest) b.chest.bot = b.id;
     }
   }
+  const sd = Math.hypot(b.x - storm.x, b.z - storm.z), inStorm = sd > storm.r - 4, stormDanger = inStorm || (storm.shrink && sd > storm.r - 20);
+  const szx = storm.shrink || storm.nr ? storm.nx : storm.x, szz = storm.shrink || storm.nr ? storm.nz : storm.z;
   const t = b.tgt, crouchNow = b.coverT > gameT, reloading = b.relT > gameT;
   let fl = 0;
   // Heilen (mit Animation), nur wenn gerade niemand schießt
   if (b.healT > gameT) {
-    if (t && t.alive && gameT - b.lastHurt < 1) b.healT = 0;
+    if ((t && t.alive && gameT - b.lastHurt < 1) || inStorm) { b.healT = 0; b.healK = null; }
     else { b.fl = 8192 | (b.boxed > gameT ? 8 : 0); b.w = b.healK; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
   } else if (b.healK) {
     if (b.healK === 'med') b.hp = 100; else b.sh = Math.min(100, b.sh + 50);
     b.healK = null; b.heals = Math.max(0, b.heals - 1);
   }
-  if (b.heals > 0 && !b.healK && gameT - b.lastHurt > (t ? 6 : 2.5) && (b.hp < 70 || (b.sh < 50 && !t))) {
+  if (b.heals > 0 && !b.healK && !stormDanger && gameT - b.lastHurt > (t ? 6 : 2.5) && (b.hp < 70 || (b.sh < 50 && !t))) {
     b.healK = b.hp < 70 ? 'med' : 'pot'; b.healT = gameT + (b.healK === 'med' ? 6 : 3.5);
   }
   // wenig Leben im Kampf: Kasten bauen und heilen
-  if (t && b.hp < 45 && b.heals > 0 && b.boxed < gameT - 15 && Math.random() < 0.6 * b.skill) {
+  if (t && !stormDanger && b.hp < 45 && b.heals > 0 && b.boxed < gameT - 15 && Math.random() < 0.6 * b.skill) {
     b.boxed = gameT + 7; const pcx = Math.floor(b.x / G), pcz = Math.floor(b.z / G), iy = Math.floor((b.y - b.jy + 0.4) / H), mat = Math.random() < 0.5 ? 'stone' : 'wood';
     for (const p of [{ t: 'w', d: 0, ix: pcx, iz: pcz }, { t: 'w', d: 0, ix: pcx, iz: pcz + 1 }, { t: 'w', d: 1, ix: pcx, iz: pcz }, { t: 'w', d: 1, ix: pcx + 1, iz: pcz }, { t: 'c', ix: pcx, iz: pcz, iy: iy + 1 }]) addPiece({ ...p, iy: p.iy ?? iy, mat }, true, true);
     b.x = (pcx + 0.5) * G; b.z = (pcz + 0.5) * G; b.healK = 'med'; b.healT = gameT + 6; b.coverT = gameT + 6;
@@ -750,14 +752,23 @@ function botTick(b, dt) {
     }
   }
   if (b.relDone && !reloading) { b.relDone = false; b.mag = S.W[b.wpn.w].mag; }
-  if (b.emoteT > gameT && !t) { b.fl = 256; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
+  if (b.emoteT > gameT && !t && !inStorm) { b.fl = 256; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
   if (t && t.alive && b.wpn) {
     const dx = t.x - b.x, dz = t.z - b.z, d = Math.hypot(dx, dz) || 1, d3 = Math.hypot(dx, t.y - b.y, dz);
     b.yaw = Math.atan2(-dx, -dz); b.pitch = Math.atan2(t.y + (t.down ? 0.3 : 1.2) - b.y - 1.4, d);
     if (gameT >= b.nextStrafe) { b.strafe = Math.random() < 0.5 ? -1 : 1; b.nextStrafe = gameT + 0.7 + Math.random() * 1.3; if (d < 22 && b.jy === 0 && Math.random() < 0.3 * b.skill) b.jv = 7.2; }
     const want = { shotgun: 7, tac: 7, smg: 13, pistol: 16, ar: 22, hunt: 40, sniper: 45 }[b.wpn.w] || 18;
     const f = crouchNow ? 0 : d > want + 3 ? 1 : d < want - 3 ? -0.7 : 0, sf = crouchNow ? 0.25 : 0.75;
-    moveBot(b, (dx / d) * f + (-dz / d) * b.strafe * sf, (dz / d) * f + (dx / d) * b.strafe * sf, crouchNow ? 2 : 4.4, dt);
+    if (stormDanger) { const zx = szx - b.x, zz = szz - b.z, zd = Math.hypot(zx, zz) || 1; moveBot(b, zx / zd + (-zz / zd) * b.strafe * 0.3, zz / zd + (zx / zd) * b.strafe * 0.3, 5.8, dt); }
+    else {
+      // unter Beschuss: Wand zum Gegner bauen (wie echte Spieler)
+      if (gameT - b.lastHurt < 0.4 && gameT >= (b.nextWall || 0) && d > 6 && Math.random() < 0.45 * b.skill) {
+        b.nextWall = gameT + 2.5 + Math.random() * 2; const cx = Math.floor(b.x / G), cz = Math.floor(b.z / G), iy = Math.floor((b.y - b.jy + 0.4) / H);
+        const pc = Math.abs(dx) > Math.abs(dz) ? { t: 'w', d: 1, ix: cx + (dx > 0 ? 1 : 0), iz: cz } : { t: 'w', d: 0, ix: cx, iz: cz + (dz > 0 ? 1 : 0) };
+        addPiece({ ...pc, iy, mat: 'wood' }, true, true); b.coverT = gameT + 0.8 + Math.random();
+      }
+          moveBot(b, (dx / d) * f + (-dz / d) * b.strafe * sf, (dz / d) * f + (dx / d) * b.strafe * sf, crouchNow ? 2 : 4.4, dt);
+    }
     if (crouchNow) fl |= 8;
     if (d3 > 24 && !reloading) fl |= 64;
     if (crouchNow && b.hp < 75) b.hp = Math.min(75, b.hp + 9 * dt);
@@ -767,7 +778,7 @@ function botTick(b, dt) {
       if (--b.burst <= 0 && W.rate < 300) { b.burst = 3 + rnd(6); b.nextShot += 0.35 + Math.random() * 0.6; }
       if (--b.mag <= 0) { b.relT = gameT + W.rel; b.relDone = true; }
       const clear = los(b, t, d3);
-      let p = Math.min(0.26, Math.max(0.04, 0.34 - d3 / 160)) * b.skill;
+      let p = Math.min(0.32, Math.max(0.06, 0.4 - d3 / 150)) * b.skill;
       if (t.fl & 8) p *= 0.8; if (t.fl & 16) p *= 0.6;
       let n = 0;
       if (clear) for (let i = 0; i < W.pellets; i++) if (Math.random() < p) n++;
@@ -788,7 +799,8 @@ function botTick(b, dt) {
     let card = null, van = null;
     if (b.card) { let vd = 1e9; for (const v of world.vans) { const dd = Math.hypot(v.x - b.x, v.z - b.z); if (dd < vd) { vd = dd; van = v; } } }
     else if (matchMode === 'duo' && b.mate && !b.mate.alive) for (const c of world.cards.values()) if (c.team === b.team) { card = c; break; }
-    if (mate && mate.down) { gx = mate.x; gz = mate.z; sp = 5.8; mateGoal = true; }
+    if (stormDanger) { gx = szx + (b.wx - szx) * 0.3; gz = szz + (b.wz - szz) * 0.3; sp = 6.2; b.chest = null; }
+    else if (mate && mate.down) { gx = mate.x; gz = mate.z; sp = 5.8; mateGoal = true; }
     else if (van) { gx = van.x; gz = van.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 3.5) startReboot(b, van); }
     else if (card) { gx = card.x; gz = card.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 2.5) { world.cards.delete(card.id); b.card = card.o; broadcast({ t: 'card-', id: card.id, by: b.id }); } }
     else if (b.chest && !b.chest.open) { gx = b.chest.x; gz = b.chest.z; sp = 5.8; }

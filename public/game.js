@@ -1771,6 +1771,7 @@ function updateMe(dt, now) {
   const kd = Math.exp(-dt * (me.onGround ? 6 : 1.5)); me.kx *= kd; me.kz *= kd;
   me.speed = Math.hypot(me.x - ox, me.z - oz) / dt;
 }
+let camDist = 3.5;
 function updateCamera(dt) {
   const f = focus(), spec = f !== me, drive = !spec && myCar;
   const yaw = spec ? f.yaw : VY(), pitch = spec ? clamp(f.pitch || 0, -0.6, 0.6) - 0.15 : VP();
@@ -1781,10 +1782,17 @@ function updateCamera(dt) {
   pivot.set(f.x + Math.cos(yaw) * side, f.y + (drive ? 2.3 : (spec ? f.fl & 512 : me.down) ? 0.95 : me.ads && !spec ? 1.68 : 1.8) - cr, f.z - Math.sin(yaw) * side);
   let dist = scoped ? 0 : drive ? 8.5 : me.ads && !spec ? 2.1 : me.st === 'ship' && !spec ? 26 : (f.fl & 6) || (!spec && me.st !== 'ground') ? 7 : (f.fl & 16) ? 8 : !spec && me.emote > 0 ? 5.5 : 3.5;
   if (dist > 0 && !(me.st === 'ship' && !spec)) {
-    const h = raycast(pivot.x, pivot.y, pivot.z, -dir.x, -dir.y, -dir.z, dist + 0.3, true);
-    if (h.kind && h.kind !== 'obj' && h.kind !== 'car') dist = Math.max(0.4, h.dist - 0.3);
+    // Schulter-Versatz nicht durch Wände (enge Häuser): seitlich prüfen und einziehen
+    if (side > 0 && !spec) {
+      const hx = f.x, hy = pivot.y, hz = f.z, sx = Math.cos(yaw), sz = -Math.sin(yaw), hs = raycast(hx, hy, hz, sx, 0, sz, side + 0.35, true);
+      if (hs.kind && hs.kind !== 'car') { const ns = Math.max(0, hs.dist - 0.35); pivot.x = hx + sx * ns; pivot.z = hz + sz * ns; }
+    }
+    const h = raycast(pivot.x, pivot.y, pivot.z, -dir.x, -dir.y, -dir.z, dist + 0.4, true);
+    if (h.kind && h.kind !== 'car') dist = Math.max(0.35, h.dist - 0.4);
   }
-  camPos.copy(pivot).addScaledVector(dir, -dist);
+  // sanft rausfahren, sofort reinziehen (kein Durch-die-Wand-Gucken, kein Zucken)
+  camDist = dist < camDist ? dist : lerp(camDist, dist, Math.min(1, dt * 6)); if (!(camDist >= 0)) camDist = dist;
+  camPos.copy(pivot).addScaledVector(dir, -camDist);
   const sk = CFG.shake ? shake : 0;
   let bob = 0, roll = 0;
   if (!spec && CFG.bob && me.st === 'ground' && me.onGround && !myCar && !scoped) { const k = clamp(me.speed / 7.6, 0, 1) * (me.ads ? 0.3 : 1); camBob += dt * me.speed * 1.55; bob = Math.abs(Math.sin(camBob)) * 0.045 * k; roll = Math.sin(camBob) * 0.004 * k; }

@@ -90,7 +90,14 @@ export function gun(w, p) {
     const m = GMAP[w], d = p ? dist(p) : 0, far = d > 150, delay = Math.min(1.4, d / 343);
     sample(m[0], p, m[1] * (far ? 1.4 : 1), m[2] * (far ? 0.93 : 1), { ref: 6, roll: 0.72, air: 120, rev: p ? 0.15 : 0.06, revD: 180, delay });
     if (d > 60) sample(m[0], p, m[1] * Math.min(0.5, d / 400), m[2] * 0.95, { ref: 6, roll: 0.6, air: 70, rev: 0.6, revD: 120, delay: delay + 0.25 + Math.random() * 0.35 });
-    if (!p) { const g = GUN[w], t = C.currentTime, o = out(null); os(o, t, g[5] * 0.9, g[3] * 0.8, 38, { vol: g[2] * 0.55 }); nz(o, t, 0.02, 7000, { type: 'highpass', vol: g[2] * 0.25 }); }
+    if (!p) {
+      // eigener Schuss: tiefer Bass-Schlag, scharfer Knall und Nachhall – mehr Wumms
+      const g = GUN[w], t = C.currentTime, o = out(null), big = w === 'sniper' || w === 'hunt' || w === 'shotgun' || w === 'tac' ? 1.5 : 1;
+      os(o, t, g[5] * 1.3 * big, g[3] * 0.8, 32, { vol: g[2] * 0.85 * big, type: 'sine' });
+      os(o, t, 0.05, 140, 45, { vol: g[2] * 0.5 * big, type: 'triangle' });
+      nz(o, t, 0.025, 7000, { type: 'highpass', vol: g[2] * 0.4 });
+      nz(o, t + 0.02, 0.35 * big, 600, { f2: 150, vol: g[2] * 0.22 * big, pink: true, a: 0.01 });
+    }
     return; }
   if (!ok(p, 600)) return; const g = GUN[w]; if (!g) return rocketLaunch(p);
   const t = C.currentTime, d = dist(p), o = out(p, { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.12, revD: 220 }), far = d > 120;
