@@ -2,7 +2,7 @@ import * as THREE from './lib/three.module.js';
 import * as SFX from './sfx.js';
 import { PROPS, loadProps } from './props.js';
 const propsP = loadProps().catch((e) => { console.warn('Modelle', e); return null; });
-import { CFG, initSettings, isOpen as setOpen, remap, openSettings, closeSettings, bindName } from './settings.js';
+import { CFG, initSettings, isOpen as setOpen, remap, openSettings, closeSettings, bindName, PAD_ACTIONS, padBtn } from './settings.js';
 import { VM, WM as WMAT, merge, pickaxeGeo, weaponGeo, weaponModel, MUZZLE, RARMAT, BPGEO, itemGeo, chestModel, ammoBoxModel, dropModel, vanModel, cardGeo, rocketGeo, bushGeo, makeChar as buildChar, disposeChar, carModel, CARSEAT, natureGeos, houseDeco, streakGeo, makeSky, makeClouds, pieceMaterials, stormTexture } from './models.js';
 import { U, quality, TIER, makePost, groundTextures, terrainMaterial, waterMaterial, windMaterial, Particles } from './gfx.js';
 const S = window.S, G = S.G, H = S.H, HP = Math.PI / 2;
@@ -1044,7 +1044,7 @@ $('ixs').addEventListener('pointerdown', (e) => {
   // Nur das Item-Bild wandert mit, der Slot bleibt stehen
   e.preventDefault(); const ic = sl.querySelector('img') || sl.querySelector(':scope > :not(.k):not(.a):not(.rl)'), g = document.createElement('div'); g.className = 'ixg';
   if (ic) g.appendChild(ic.cloneNode(true)); document.body.appendChild(g); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
-  if (ic) ic.style.visibility = 'hidden'; ixDrag = { i, g, src: sl, ic, pid: e.pointerId };
+  if (ic) ic.style.visibility = 'hidden'; ixDrag = { i, g, src: sl, ic, pid: e.pointerId }; try { $('invx').setPointerCapture(e.pointerId); } catch (er) {}
 });
 addEventListener('pointermove', (e) => {
   if (!ixDrag || e.pointerId !== ixDrag.pid) return; ixDrag.g.style.left = e.clientX + 'px'; ixDrag.g.style.top = e.clientY + 'px';
@@ -1154,7 +1154,7 @@ addEventListener('keydown', (e0) => {
   if (e.code === 'Tab' && phase !== 'menu' && phase !== 'lobby') { e.preventDefault(); renderScore(); $('score').style.display = 'block'; return; }
   if (e.code === 'KeyH' && phase === 'game') { e0.preventDefault(); toggleInv(); return; }
   if (e.code === 'Escape' && invOpen) { toggleInv(false); return; }
-  if (!locked) return;
+  if (!locked && !pad.on) return;
   if (['Space', 'KeyF', 'ControlLeft', 'KeyQ', 'KeyC', 'KeyV', 'KeyG', 'KeyT', 'KeyR', 'KeyE', 'KeyB', 'F1', 'F3'].includes(e.code) || e.ctrlKey || e0.code === 'Space') e.preventDefault();
   if (e.repeat) return;
   keys[e.code] = true; if (e.code === 'Space') jumpEdge = true;
@@ -1653,6 +1653,7 @@ function actions(dt, now) {
 function wish() {
   let f = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0), r = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
   if (joy.id !== null) { f = -joy.y; r = joy.x; joyM = Math.hypot(f, r); if (joyM < 0.18) return [0, 0, 0]; }
+  else if (pad.m > 0.18) { f = -pad.ly; r = pad.lx; const l = Math.max(1, pad.m); f /= l; r /= l; }
   else { const l = Math.hypot(f, r); if (!l) return [0, 0, 0]; f /= l; r /= l; }
   return [-Math.sin(me.yaw) * f + Math.cos(me.yaw) * r, -Math.cos(me.yaw) * f - Math.sin(me.yaw) * r, f];
 }
@@ -1669,6 +1670,33 @@ function tryMantle(wx, wz) {
     return true;
   }
   return false;
+}
+// ================= Controller (Gamepad-API: Android-App, Chrome/Edge, Safari auf iPad) =================
+const pad = { on: false, lx: 0, ly: 0, m: 0, prev: [], t: 0 };
+addEventListener('gamepadconnected', () => { pad.on = true; banner('Controller verbunden 🎮', 2); });
+addEventListener('gamepaddisconnected', () => { if (![...navigator.getGamepads()].some(Boolean)) { pad.on = false; pad.m = 0; banner('Controller getrennt', 2); } });
+function padKey(a, down) {
+  if (a === 'fire') { mouseL = down; return; }
+  if (a === 'ads') { if (me.build) { if (down) { const ms = Object.keys(S.MATS); me.bmat = ms[(ms.indexOf(me.bmat) + 1) % 3]; hudDirty = true; } } else mouseR = down; return; }
+  if (a === 'prev' || a === 'next') { if (down && me.alive && !me.build) setSlot((me.slot + (a === 'next' ? 1 : 5)) % 6); return; }
+  dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { code: CFG.binds[a] || a }));
+}
+function pollPad(dt) {
+  if (!navigator.getGamepads) return; let g = null; for (const x of navigator.getGamepads()) if (x && x.connected) { g = x; break; }
+  if (!g) { pad.m = 0; return; } pad.on = true;
+  const dz = (v) => (Math.abs(v) < 0.14 ? 0 : (v - Math.sign(v) * 0.14) / 0.86), ax = g.axes;
+  pad.lx = dz(ax[0] || 0); pad.ly = dz(ax[1] || 0); pad.m = Math.hypot(pad.lx, pad.ly);
+  const b = g.buttons.map((x) => x.pressed || x.value > 0.4);
+  if (setOpen() || invOpen) { pad.prev = b; return; }
+  if (phase === 'menu' || phase === 'lobby') { if (b[0] && !pad.prev[0] && phase === 'menu') $('play').click(); if (b[9] && !pad.prev[9]) openSettings(); pad.prev = b; return; }
+  if (!me.alive && b[0] && !pad.prev[0] && phase === 'game') cycleSpec();
+  for (const [a] of PAD_ACTIONS) { const i = padBtn(a); if (i < 0) continue; if (b[i] && !pad.prev[i]) padKey(a, true); else if (!b[i] && pad.prev[i]) padKey(a, false); }
+  pad.prev = b;
+  const rx = dz(ax[2] || 0), ry = dz(ax[3] || 0);
+  if ((rx || ry) && me.alive && !myCar) {
+    const k = 3.4 * CFG.padSens * CFG.sens * (me.ads ? CFG.ads : 1) * dt;
+    me.yaw -= rx * Math.abs(rx) * k; me.pitch = clamp(me.pitch - ry * Math.abs(ry) * k * 0.75 * (CFG.invY ? -1 : 1), -1.5, 1.5);
+  }
 }
 function updateMe(dt, now) {
   rec.p += (rec.tp - rec.p) * Math.min(1, dt * 28); rec.y += (rec.ty - rec.y) * Math.min(1, dt * 28);
@@ -1706,7 +1734,7 @@ function updateMe(dt, now) {
     return;
   }
   const airSpr = !me.onGround && me.airSprint && !!(wx || wz);
-  me.sprint = airSpr || !!(wx || wz) && fw > 0.3 && !me.ads && !me.crouch && !me.using && !me.down && !me.swim && (joy.id !== null ? joyM > 0.62 : CFG.autoSprint ? !keys.ShiftLeft : !!keys.ShiftLeft);
+  me.sprint = airSpr || !!(wx || wz) && fw > 0.3 && !me.ads && !me.crouch && !me.using && !me.down && !me.swim && (joy.id !== null ? joyM > 0.62 : pad.m > 0.18 ? pad.m > 0.93 || !!keys.ShiftLeft : CFG.autoSprint ? !keys.ShiftLeft : !!keys.ShiftLeft);
   let sp = me.down ? 1.7 : me.swim ? (me.sprint ? 4.6 : 3.4) : me.crouch ? 3 : me.sprint ? 7.6 : 5.6;
   if (me.ads) sp *= 0.6; if (me.using) sp *= 0.5;
   if (!me.swim && S.height(me.x, me.z) < -0.6) sp *= 0.6;
@@ -1833,7 +1861,7 @@ let lodAcc = 0, lastT = performance.now(), sendAcc = 0, scanAcc = 0, mapAcc = 0,
 const po = {};
 function frame(nowMs) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.1, (nowMs - lastT) / 1000); lastT = nowMs; T += dt;
+  const dt = Math.min(0.1, (nowMs - lastT) / 1000); lastT = nowMs; T += dt; pollPad(dt);
   if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').style.opacity = 0; }
   if (gainT > 0) { gainT -= dt; if (gainT <= 0) $('gain').style.opacity = 0; }
   if (elimT > 0) { elimT -= dt; if (elimT <= 0) $('elim').style.opacity = 0; }

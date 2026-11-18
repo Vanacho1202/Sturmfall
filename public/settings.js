@@ -2,13 +2,22 @@
 const TOUCH0 = matchMedia('(pointer: coarse)').matches || /[?&]touch=1/.test(location.search);
 const DEF = {
   v: 3, fullscreen: true, auto: TOUCH0, sens: 1, ads: 0.6, scope: 0.22, invY: false, fov: 72, shake: true, bob: true, dmgNum: true, crouchToggle: true, autoSprint: false,
-  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, hudScale: 1, hudAlpha: 0.85, shad: true,
+  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, pad: {}, padSens: 1, hudScale: 1, hudAlpha: 0.85, shad: true,
 };
 export const ACTIONS = [
   ['KeyW', 'Vorwärts'], ['KeyS', 'Rückwärts'], ['KeyA', 'Links'], ['KeyD', 'Rechts'], ['Space', 'Springen / Gleiter'], ['ControlLeft', 'Ducken / Rutschen'], ['ShiftLeft', 'Sprinten (halten)'],
   ['KeyR', 'Nachladen'], ['KeyE', 'Benutzen / Aufheben'], ['KeyX', 'Gegenstand fallen lassen'], ['KeyQ', 'Wand'], ['KeyF', 'Boden'], ['KeyC', 'Rampe'], ['KeyV', 'Dach'], ['KeyG', 'Wand bearbeiten'],
   ['KeyH', 'Inventar sortieren'], ['KeyM', 'Karte'], ['KeyT', 'Markieren'], ['KeyB', 'Tanzen'], ['Tab', 'Spielerliste'], ['KeyP', 'Einstellungen'],
 ];
+// Controller (PS4/PS5/Xbox per Bluetooth) – Standard wie im Battle-Royale-Gewohnten, unter ⚙ umbelegbar
+export const PAD_ACTIONS = [
+  ['fire', 'Schießen', 7], ['ads', 'Zielen', 6], ['Space', 'Springen / Gleiter', 0], ['ControlLeft', 'Ducken / Rutschen', 1], ['KeyR', 'Nachladen', 2],
+  ['KeyE', 'Benutzen / Aufheben', 3], ['prev', 'Vorheriger Slot', 4], ['next', 'Nächster Slot', 5], ['ShiftLeft', 'Sprinten (halten)', 10], ['KeyX', 'Wand bearbeiten', 11],
+  ['KeyQ', 'Wand', 12], ['KeyF', 'Boden', 13], ['KeyC', 'Rampe', 14], ['KeyV', 'Dach', 15], ['KeyM', 'Karte', 8], ['KeyP', 'Einstellungen', 9], ['KeyH', 'Inventar', 17], ['KeyG', 'Fallen lassen', -1],
+];
+export const PAD_NAMES = ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share', 'Options', 'L3', 'R3', '↑', '↓', '←', '→', 'PS', 'Touchpad'];
+export const padSeen = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(Boolean); } catch (e) { return false; } };
+export const padBtn = (a) => { const v = CFG.pad[a]; return v != null ? v : PAD_ACTIONS.find((x) => x[0] === a)[2]; };
 export const CFG = JSON.parse(JSON.stringify(DEF));
 try { const s = JSON.parse(localStorage.getItem('sf_cfg') || '{}'); for (const k in s) if (k in DEF) CFG[k] = typeof DEF[k] === 'object' && !Array.isArray(DEF[k]) ? { ...DEF[k], ...s[k] } : s[k]; } catch (e) {}
 // Version 3: G = fallen lassen, X = Wand bearbeiten (wenn nicht selbst belegt)
@@ -85,6 +94,7 @@ const TABS = {
     row('Empfindlichkeit im Zielfernrohr', '', rg('scope', 0.08, 0.8, 0.01, '%')) +
     row('Y-Achse umkehren', '', tg('invY')) +
     row('Sichtfeld (FOV)', '', rg('fov', 60, 100, 1, '°')),
+  controller: () => row('Controller', 'PS4/PS5/Xbox per Bluetooth verbinden und eine Taste drücken. Linker Stick = Laufen (ganz drücken = Sprinten), rechter Stick = Umsehen', '') + row('Stick-Empfindlichkeit', '', rg('padSens', 0.3, 3, 0.05, 'x')) + PAD_ACTIONS.map(([a, n]) => row(n, '', `<button class="kb" data-pb="${a}">${padBtn(a) < 0 ? '–' : PAD_NAMES[padBtn(a)] || 'B' + padBtn(a)}</button>`)).join('') + `<button class="bt" data-act="resetPad">Standard wiederherstellen</button>`,
   tasten: () => ACTIONS.map(([d, n]) => row(n, '', `<button class="kb" data-kb="${d}">${bindName(d)}</button>`)).join('') + `<button class="bt" data-act="resetKeys">Standard wiederherstellen</button>`,
   audio: () =>
     row('Gesamtlautstärke', '', rg('vol', 0, 1, 0.01, '%', 'm')) +
@@ -99,7 +109,7 @@ const TABS = {
     row('Deckkraft', '', rg('hudAlpha', 0.2, 1, 0.05, '%')) +
     `<button class="bt y" data-act="editHud">Knöpfe verschieben</button><button class="bt" data-act="resetHud">Standard-Layout</button>`,
 };
-const TABN = { spiel: 'Spiel', steuerung: 'Maus & Touch', tasten: 'Tasten', audio: 'Audio', grafik: 'Grafik', knoepfe: 'Knöpfe' };
+const TABN = { spiel: 'Spiel', steuerung: 'Maus & Touch', tasten: 'Tasten', controller: 'Controller', audio: 'Audio', grafik: 'Grafik', knoepfe: 'Knöpfe' };
 let tab = 'spiel', waitKey = null;
 
 export function initSettings(o) {
@@ -131,7 +141,7 @@ function setBind(def, code) {
 }
 function render() {
   const d = $('settings'), tabs = d.querySelector('.tabs');
-  const list = Object.keys(TABS).filter((k) => !(k === 'tasten' && ctx.touch) && !(k === 'knoepfe' && !ctx.touch));
+  const list = Object.keys(TABS).filter((k) => !(k === 'tasten' && ctx.touch && !padSeen()) && !(k === 'knoepfe' && !ctx.touch));
   tabs.innerHTML = list.map((k) => `<button data-tab="${k}" class="${k === tab ? 'sel' : ''}">${TABN[k]}</button>`).join('');
   tabs.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); ctx.sfx && ctx.sfx.ui('click'); }));
   const sb = d.querySelector('.sb'); sb.innerHTML = TABS[tab]();
@@ -141,9 +151,21 @@ function render() {
     show(); r.oninput = () => { if (sub) CFG[k][sub] = +r.value; else CFG[k] = +r.value; show(); changed(); };
   });
   sb.querySelectorAll('[data-kb]').forEach((b) => (b.onclick = () => { waitKey = b.dataset.kb; b.classList.add('wait'); b.textContent = 'Taste drücken …'; }));
+  sb.querySelectorAll('[data-pb]').forEach((b) => (b.onclick = () => {
+    b.classList.add('wait'); b.textContent = 'Controller-Taste …'; const a = b.dataset.pb, t0 = performance.now();
+    const held = new Set(); for (const g of navigator.getGamepads ? navigator.getGamepads() : []) if (g) g.buttons.forEach((x, i) => x.pressed && held.add(i));
+    const iv = setInterval(() => {
+      if (!open || performance.now() - t0 > 8000) { clearInterval(iv); render(); return; }
+      for (const g of navigator.getGamepads()) if (g) for (let i = 0; i < g.buttons.length; i++) {
+        if (!g.buttons[i].pressed) { held.delete(i); continue; } if (held.has(i)) continue;
+        clearInterval(iv); for (const [a2] of PAD_ACTIONS) if (a2 !== a && padBtn(a2) === i) CFG.pad[a2] = padBtn(a); CFG.pad[a] = i; save(); render(); return;
+      }
+    }, 50);
+  }));
   sb.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => ctx.setQuality(b.dataset.q)));
   sb.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => {
     const a = b.dataset.act;
+    if (a === 'resetPad') { CFG.pad = {}; render(); }
     if (a === 'resetKeys') { CFG.binds = { ...DEF.binds }; buildRemap(); render(); }
     if (a === 'resetHud') { CFG.hud = {}; CFG.hudScale = 1; CFG.hudAlpha = 0.85; render(); }
     if (a === 'editHud') { closeSettings(); startHudEdit(); }
