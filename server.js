@@ -5,7 +5,7 @@ const S = require('./public/shared.js');
 const G = S.G, H = S.H, SHIPY = S.SHIPY;
 const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
-const TOTAL = +process.env.TOTAL || 500, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
+const TOTAL = +process.env.TOTAL || 600, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
 const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
 const OT = ['tree', 'rock', 'crate', 'barrel', 'prop'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
@@ -672,8 +672,13 @@ function botTick(b, dt) {
       const cand = S.POIS.filter((p2) => Math.hypot(p2.x - b.x, p2.z - b.z) < 380);
       const a = Math.random() * 6.283;
       if (b.lead && b.lead.st !== 'ship') { b.tx = b.lead.tx + b.ox; b.tz = b.lead.tz + b.oz; }
-      else if (cand.length && Math.random() < 0.75) { const p2 = pick(cand), d = Math.random() * p2.r; b.tx = p2.x + Math.cos(a) * d; b.tz = p2.z + Math.sin(a) * d; }
-      else { const d = Math.random() * 200; b.tx = b.x + Math.cos(a) * d; b.tz = b.z + Math.sin(a) * d; }
+      // gleichmäßig verteilen: am wenigsten belegter Ort in Reichweite, sonst irgendwo frei auf der Karte
+      else if (cand.length && Math.random() < 0.45) {
+        world.poiN = world.poiN || new Map(); let p2 = null, pn = 1e9;
+        for (const c of cand) { const n = (world.poiN.get(c) || 0) / Math.max(1, c.r / 40) + Math.random() * 0.5; if (n < pn) { pn = n; p2 = c; } }
+        world.poiN.set(p2, (world.poiN.get(p2) || 0) + 1); const d = Math.sqrt(Math.random()) * p2.r; b.tx = p2.x + Math.cos(a) * d; b.tz = p2.z + Math.sin(a) * d;
+      }
+      else { const d = 60 + Math.sqrt(Math.random()) * 420; b.tx = b.x + Math.cos(a) * d; b.tz = b.z + Math.sin(a) * d; }
       clampLand(b, 'tx', 'tz', LIM);
     }
     return;
@@ -702,15 +707,15 @@ function botTick(b, dt) {
   if (b.rev) { const v = b.rev.v; b.yaw = Math.atan2(-(v.x - b.x), -(v.z - b.z)); b.fl = 8; b.w = 'none'; b.pitch = -0.4; b.y = S.height(b.x, b.z); return; }
   if (gameT >= b.nextScan) {
     b.nextScan = gameT + 0.45;
-    let best = null, bd = 72;
-    forNear(b.x, b.z, 72, (e) => {
+    let best = null, bd = 55;
+    forNear(b.x, b.z, 55, (e) => {
       if (e === b || !e.alive || e.team === b.team || (e.fl & 7)) return;
       const d = Math.hypot(e.x - b.x, e.y - b.y, e.z - b.z) + (e.down ? 12 : 0);
       if (d < bd && los(b, e, d)) { bd = d; best = e; }
     });
     const th = b.threat;
-    if (th && th.alive && b.threatT > gameT && th !== best && th.team !== b.team) { const d = Math.hypot(th.x - b.x, th.y - b.y, th.z - b.z); if (d < 95 && los(b, th, d)) best = th; }
-    if (best !== b.tgt) { b.tgt = best; b.nextShot = Math.max(b.nextShot, gameT + (0.6 + Math.random() * 0.5) / b.skill); }
+    if (th && th.alive && b.threatT > gameT && th !== best && th.team !== b.team) { const d = Math.hypot(th.x - b.x, th.y - b.y, th.z - b.z); if (d < 75 && los(b, th, d)) best = th; }
+    if (best !== b.tgt) { b.tgt = best; b.nextShot = Math.max(b.nextShot, gameT + (0.9 + Math.random() * 0.8) / b.skill); }
     if (best) b.seen = { x: best.x, z: best.z, t: gameT };
     if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 5 || (storm.nr && !storm.shrink && storm.timer < 25 + b.skill * 10 && Math.hypot(b.x - storm.nx, b.z - storm.nz) > storm.nr - 8 && b.toNext !== storm.i)) { newWaypoint(b, true); b.toNext = storm.i; b.chest = null; }
     if ((!b.wpn || (b.wpn.r < 3 && !best)) && !b.chest && gameT >= b.nextChest) {
@@ -778,7 +783,7 @@ function botTick(b, dt) {
       if (--b.burst <= 0 && W.rate < 300) { b.burst = 3 + rnd(6); b.nextShot += 0.35 + Math.random() * 0.6; }
       if (--b.mag <= 0) { b.relT = gameT + W.rel; b.relDone = true; }
       const clear = los(b, t, d3);
-      let p = Math.min(0.32, Math.max(0.06, 0.4 - d3 / 150)) * b.skill;
+      let p = Math.min(0.28, Math.max(0.05, 0.36 - d3 / 150)) * b.skill;
       if (t.fl & 8) p *= 0.8; if (t.fl & 16) p *= 0.6;
       let n = 0;
       if (clear) for (let i = 0; i < W.pellets; i++) if (Math.random() < p) n++;

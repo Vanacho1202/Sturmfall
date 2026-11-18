@@ -1737,7 +1737,7 @@ function updateMe(dt, now) {
   }
   const airSpr = !me.onGround && me.airSprint && !!(wx || wz);
   me.sprint = airSpr || !!(wx || wz) && fw > 0.3 && !me.ads && !me.crouch && !me.using && !me.down && !me.swim && (joy.id !== null ? joyM > 0.62 : pad.m > 0.18 ? pad.m > 0.93 || !!keys.ShiftLeft : CFG.autoSprint ? !keys.ShiftLeft : !!keys.ShiftLeft);
-  let sp = me.down ? 1.7 : me.swim ? (me.sprint ? 4.6 : 3.4) : me.crouch ? 3 : me.sprint ? 7.6 : 5.6;
+  let sp = me.down ? 1.7 : me.swim ? (me.sprint ? 4.6 : 3.4) : me.crouch ? 3 : me.sprint ? 10.5 : 5.6;
   if (me.ads) sp *= 0.6; if (me.using) sp *= 0.5;
   if (!me.swim && S.height(me.x, me.z) < -0.6) sp *= 0.6;
   let vx = wx * sp, vz = wz * sp;
