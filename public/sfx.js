@@ -84,12 +84,17 @@ function sample(k, p, vol, rate, o) {
   const src = C.createBufferSource(), g = C.createGain(); src.buffer = buf; src.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
   g.gain.value = vol; src.connect(g); g.connect(out(p, o)); src.start(C.currentTime + ((o && o.delay) || 0)); return true;
 }
+// Sprach-Budget: bei vielen Spielern nicht hunderte Audio-Knoten gleichzeitig (verhindert Ruckeln)
+let gv = [];
+function gunBudget() { const t = C.currentTime; gv = gv.filter((x) => x > t); return gv.length; }
 export function gun(w, p) {
+  let busy = 0;
+  if (p && C) { busy = gunBudget(); const d0 = dist(p); if (busy >= 12 || (busy >= 6 && d0 > 80) || (busy >= 3 && d0 > 250)) return; gv.push(C.currentTime + (d0 > 150 ? 1.2 : 0.5)); }
   if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) {
     // Entfernung hörbar: Schall braucht Zeit (343 m/s), klingt dumpfer, mehr Hall und ein Echo
     const m = GMAP[w], d = p ? dist(p) : 0, far = d > 150, delay = Math.min(1.4, d / 343);
     sample(m[0], p, m[1] * (far ? 1.4 : 1), m[2] * (far ? 0.93 : 1), { ref: 6, roll: 0.72, air: 120, rev: p ? 0.15 : 0.06, revD: 180, delay });
-    if (d > 60) sample(m[0], p, m[1] * Math.min(0.5, d / 400), m[2] * 0.95, { ref: 6, roll: 0.6, air: 70, rev: 0.6, revD: 120, delay: delay + 0.25 + Math.random() * 0.35 });
+    if (d > 60 && busy < 4) sample(m[0], p, m[1] * Math.min(0.5, d / 400), m[2] * 0.95, { ref: 6, roll: 0.6, air: 70, rev: 0.6, revD: 120, delay: delay + 0.25 + Math.random() * 0.35 });
     if (!p) {
       // eigener Schuss: tiefer Bass-Schlag, scharfer Knall und Nachhall – mehr Wumms
       const g = GUN[w], t = C.currentTime, o = out(null), big = w === 'sniper' || w === 'hunt' || w === 'shotgun' || w === 'tac' ? 1.5 : 1;
