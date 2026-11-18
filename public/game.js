@@ -540,7 +540,7 @@ function objAt(x, z, y, ox, oz, pad) {
   }
   return null;
 }
-function blocked(x, z, y, ox, oz) { return x * x + z * z > (S.R + 10) * (S.R + 10) || !!wallAt(x, z, y, ox, oz) || !!objAt(x, z, y, ox, oz, 0.35); }
+function blocked(x, z, y, ox, oz) { return (x * x + z * z > (S.R + 10) * (S.R + 10) && x * x + z * z > ox * ox + oz * oz) || !!wallAt(x, z, y, ox, oz) || !!objAt(x, z, y, ox, oz, 0.35); }
 function ceiling(x, z, y, ny) {
   const iy = Math.ceil((y + 1.8) / H);
   return pieces.has('f:' + Math.floor(x / G) + ':' + iy + ':' + Math.floor(z / G)) && ny + 1.8 >= iy * H - 0.12;
@@ -915,7 +915,7 @@ function onMsg(m) {
     }
     case 'roster': setRoster(m.r); break;
     case 'knock': {
-      const v = esc(nameOf(m.v)), k = m.k ? esc(nameOf(m.k)) : '', ic = S.W[m.w] ? pic(m.w + '0', ICON[m.w]) : m.w === 'gren' ? pic('gren', ICON.gren) : m.w === 'pick' ? pic('pick', ICON.pick) : ' ⟶ ';
+      const v = esc(nameOf(m.v));
       if (m.k === myId) { $('elim').innerHTML = '⬇ NIEDERGESCHLAGEN &nbsp;<b>' + v + '</b>'; $('elim').style.opacity = 1; elimT = 2.2; hitMarker('kill'); SFX.elim(true); }
       if (m.v === myId) meKnocked();
       if (m.v === mateId) { banner(nameOf(mateId) + ' liegt am Boden – hilf!', 3); SFX.ui('bad'); }
@@ -1097,6 +1097,15 @@ function leaveMatch() {
   $('team').style.display = 'none'; $('tag').style.display = 'none'; $('spec').style.display = 'none'; placeBeam(beamA, null); placeBeam(beamB, null);
   document.body.classList.remove('down', 'ingame', 'driving'); if (document.exitPointerLock) document.exitPointerLock();
 }
+// Zurück-Taste in der Android-App
+window.__appBack = () => {
+  if (setOpen()) { closeSettings(); return true; }
+  if ($('bigmap').style.display === 'block') { toggleMap(); return true; }
+  if (me.build) { me.build = null; hudDirty = true; return true; }
+  if ((phase === 'game' || phase === 'end') && me.alive) { openSettings(); return true; }
+  if (phase === 'game' || phase === 'end') { leaveMatch(); return true; }
+  return false;
+};
 for (const id of ['leaveD', 'leaveW']) $(id).addEventListener('click', (e) => { e.stopPropagation(); leaveMatch(); });
 $('play').onclick = () => {
   initAudio();
@@ -1561,7 +1570,8 @@ function updateMe(dt, now) {
   if (me.st === 'ship') {
     if (shipS) { me.x = shipS[0]; me.z = shipS[1]; me.y = S.SHIPY - 8; }
     const auto = shipLine && shipLine.dur ? shipLine.dur - 3 : 50;
-    if ((jump && gameT > 2.5) || gameT > auto || (!shipS && gameT > 5)) { me.st = 'dive'; keys.Space = false; banner('', 0.01); }
+    const leaving = shipS && shipLine && shipLine.dur && gameT > shipLine.dur * 0.55 && Math.hypot(shipS[0], shipS[1]) > S.R * 0.72;
+    if ((jump && gameT > 2.5) || gameT > auto || leaving || (!shipS && gameT > 5)) { me.st = 'dive'; keys.Space = false; banner('', 0.01); }
     return;
   }
   if (me.st === 'dive' || me.st === 'glide') {
@@ -1569,7 +1579,7 @@ function updateMe(dt, now) {
     if (me.st === 'dive' && (me.y - g < 55 || jump)) { me.st = 'glide'; SFX.glideOpen(); }
     const hs = me.st === 'dive' ? 24 : 15, vs = me.st === 'dive' ? 32 + (me.pitch < -0.5 ? 18 : 0) : 6.5;
     const nx = me.x + wx * hs * dt, nz = me.z + wz * hs * dt;
-    if (nx * nx + nz * nz < (S.R + 60) * (S.R + 60)) { me.x = nx; me.z = nz; }
+    if (nx * nx + nz * nz < S.R * S.R || nx * nx + nz * nz < me.x * me.x + me.z * me.z) { me.x = nx; me.z = nz; }
     me.y -= vs * dt; me.speed = 0;
     const g2 = Math.max(groundAt(me.x, me.z, me.y + 1), S.height(me.x, me.z) < -1.15 ? -1.05 : -1e9);
     if (me.y <= g2) { me.y = g2; me.st = 'ground'; me.vy = 0; me.onGround = true; me.swim = S.height(me.x, me.z) < -1.15 && g2 === -1.05; me.ch.land = 1; fx.burst(me.x, me.y + 0.1, me.z, me.swim ? '#dff2ff' : '#b9a47a', 10, 2.5, 0.15, 0.5, 2); }
@@ -1764,7 +1774,7 @@ function frame(nowMs) {
   }
   sky.position.copy(camera.position);
   $('lock').style.display = me.alive && !locked && phase === 'game' ? 'block' : 'none';
-  if (TOUCH) { const ig = me.alive && (phase === 'game' || phase === 'end'); if (ig !== document.body.classList.contains('ingame')) { document.body.classList.toggle('ingame', ig); if (!ig) { joy.id = null; joy.x = joy.y = 0; $('stick').style.display = 'none'; } } }
+  { const ig = (phase === 'game' || phase === 'end') && (me.alive || !TOUCH); if (ig !== document.body.classList.contains('ingame')) { document.body.classList.toggle('ingame', ig); if (!ig && TOUCH) { joy.id = null; joy.x = joy.y = 0; $('stick').style.display = 'none'; } } }
   const k = Math.min(1, dt * 13);
   for (const c of cars.values()) {
     if (c.id === myCar) continue;

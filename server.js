@@ -5,24 +5,28 @@ const S = require('./public/shared.js');
 const G = S.G, H = S.H, SHIPY = S.SHIPY;
 const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
-const TOTAL = +process.env.TOTAL || 100, LOBBY = +process.env.LOBBY || 15;
+const TOTAL = +process.env.TOTAL || 100, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
 const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
 const OT = ['tree', 'rock', 'crate', 'barrel'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
 // ---------- Webserver
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.mp3': 'audio/mpeg', '.apk': 'application/vnd.android.package-archive', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const gzCache = new Map();
 const server = http.createServer((req, res) => {
   let u;
   try { u = decodeURIComponent(req.url.split('?')[0]); } catch (e) { res.writeHead(400); res.end(); return; }
   if (u === '/') u = '/index.html';
   if (u === '/health') { res.end('ok'); return; }
+  if (u === '/app' || u === '/apk' || u === '/download') u = '/Sturmfall.apk';
   const f = path.join(PUB, path.normalize(u));
   if (!f.startsWith(PUB)) { res.writeHead(403); res.end(); return; }
   fs.stat(f, (e, st) => {
     if (e || !st.isFile()) { res.writeHead(404); res.end('404'); return; }
-    const head = { 'Content-Type': mime[path.extname(f)] || 'application/octet-stream', 'Cache-Control': f.includes(path.sep + 'lib' + path.sep) ? 'public, max-age=86400' : 'no-cache' };
-    const gz = /gzip/.test(req.headers['accept-encoding'] || '');
+    const ext = path.extname(f), etag = '"' + st.size.toString(36) + '-' + Math.floor(st.mtimeMs).toString(36) + '"';
+    const head = { 'Content-Type': mime[ext] || 'application/octet-stream', 'Cache-Control': f.includes(path.sep + 'lib' + path.sep) || f.includes(path.sep + 'snd' + path.sep) ? 'public, max-age=86400' : 'no-cache', ETag: etag };
+    if (ext === '.apk') head['Content-Disposition'] = 'attachment; filename="Sturmfall.apk"';
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, head); res.end(); return; }
+    const gz = /gzip/.test(req.headers['accept-encoding'] || '') && !/\.(mp3|apk|png|jpg|webp|ogg)$/.test(f);
     const k = f + st.mtimeMs;
     if (gz && gzCache.has(k)) { head['Content-Encoding'] = 'gzip'; res.writeHead(200, head); res.end(gzCache.get(k)); return; }
     fs.readFile(f, (e2, d) => {
@@ -289,7 +293,7 @@ function spawnDrop() {
 }
 // ---------- Schaden, Niederschlagen, Eliminieren
 function damage(target, amount, attacker, wname, head, kb) {
-  if (phase !== 'game' || !target || !target.alive || (target.fl & 1) || amount <= 0) return;
+  if (phase !== 'game' || !target || !target.alive || (target.fl & 1) || amount <= 0 || (GOD && !target.bot)) return;
   if (attacker && attacker !== target && attacker.team === target.team) return;
   if (attacker === target && (wname === 'gren' || wname === 'rocket' || wname === 'stink')) { if (kb) send(target, { t: 'hurt', ax: null, az: null, kb }); return; }
   if (target.bush && wname !== 'storm') target.bush = false;
@@ -647,7 +651,7 @@ function sendStates() {
 }
 let last = Date.now();
 setInterval(() => {
-  const now = Date.now(), dt = Math.min(0.2, (now - last) / 1000); last = now; tickN++;
+  const now = Date.now(), dt = SPEED > 1 ? 0.066 : Math.min(0.2, (now - last) / 1000); last = now; tickN++;
   try {
     const hs = humans();
     if (phase === 'lobby') {
@@ -682,16 +686,16 @@ setInterval(() => {
     }
     sendStates();
   } catch (e) { console.error('Tick-Fehler', e); }
-}, 66);
+}, 66 / SPEED);
 
 // ---------- Nachrichten
 const WCODES = new Set(['pick', 'build', 'none', ...Object.keys(S.W), ...Object.keys(S.CONS)]);
 function cleanItem(it) {
   if (!it || typeof it !== 'object') return null;
-  if (it.k === 'w' && S.W[it.w]) return { k: 'w', w: it.w, r: Math.min(4, Math.max(0, it.r | 0)), mag: Math.min(S.W[it.w].mag, Math.max(0, it.mag | 0)) };
+  if (it.k === 'w' && S.W[it.w]) return { k: 'w', w: it.w, r: Math.min(5, Math.max(0, it.r | 0)), mag: Math.min(S.W[it.w].mag, Math.max(0, it.mag | 0)) };
   if (it.k === 'c' && S.CONS[it.c]) return { k: 'c', c: it.c, n: Math.min(S.CONS[it.c].max, Math.max(1, it.n | 0)) };
   if (it.k === 'a' && S.AMMO[it.a]) return { k: 'a', a: it.a, n: Math.min(999, Math.max(1, it.n | 0)) };
-  if (it.k === 'm' && S.MATS[it.m]) return { k: 'm', m: it.m, n: Math.min(999, Math.max(1, it.n | 0)) };
+  if (it.k === 'm' && S.MATS[it.m]) return { k: 'm', m: it.m, n: Math.min(1000, Math.max(1, it.n | 0)) };
   return null;
 }
 function onMsg(c, m) {
