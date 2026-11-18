@@ -746,10 +746,12 @@ function renderHud() {
 let lastGap = -1;
 function updateCross(spread, mode) {
   // Beim Zielen deutlich kleiner: kurze Striche, kleiner Abstand
-  const ads = me.ads, L = ads ? 4 : 9, raw = 3 + Math.tan(spread) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2;
-  const gap = mode === 'dot' ? 3 : Math.round(ads ? Math.min(7, 2 + raw * 0.35) : Math.min(70, raw));
+  // kleines Kreuz für normale Waffen, Punkt für Sniper/Jagdgewehr
+  const ads = me.ads, L = ads ? 3 : 4, raw = Math.tan(spread) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2;
+  const gap = mode === 'dot' ? 0 : Math.round(ads ? Math.min(3, 1 + raw * 0.15) : Math.min(14, 1 + raw * 0.35));
   const key = gap + mode + L; if (key === lastGap) return; lastGap = key;
   const c = $('cross').children; $('cross').style.display = mode === 'none' ? 'none' : 'block';
+  const dot = mode === 'dot'; for (let i = 0; i < 4; i++) c[i].style.display = dot ? 'none' : ''; $('cross').classList.toggle('dot', dot);
   c[0].style.height = c[1].style.height = c[2].style.width = c[3].style.width = L + 'px';
   c[0].style.top = -(gap + L) + 'px'; c[1].style.top = gap + 'px'; c[2].style.left = -(gap + L) + 'px'; c[3].style.left = gap + 'px';
   for (let i = 0; i < 4; i++) c[i].style.display = mode === 'dot' ? 'none' : 'block';
@@ -1503,7 +1505,7 @@ function fire(it, now) {
   for (let i = 0; i < W.pellets; i++) {
     const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * sp;
     const d = dir.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(u2, Math.sin(a) * r).normalize();
-    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 1000 : 800; bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
+    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 2600 : 2300; // praktisch sofort am Ziel bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
     const h = raycast(o.x, o.y, o.z, d.x, d.y, d.z, 500);
     if (!end) end = [h.x, h.y, h.z];
     tally(h, agg);
@@ -1808,7 +1810,7 @@ function updateCamera(dt) {
   sun.position.set(f.x + 70, f.y + 120, f.z + 45); sun.target.position.set(f.x, f.y, f.z);
   if (spec || !me.alive || me.down) updateCross(0, 'none');
   else if (scoped) updateCross(0, 'none');
-  else if (it && it.k === 'w' && !me.build && !myCar) updateCross(curSpread(it), SNIP.has(it.w) && !me.ads ? 'wide' : 'x');
+  else if (it && it.k === 'w' && !me.build && !myCar) updateCross(curSpread(it), SNIP.has(it.w) || it.w === 'hunt' ? 'dot' : 'x');
   else updateCross(0, 'dot');
 }
 function sitPose(o, c) {
