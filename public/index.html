@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+<link rel="manifest" href="/manifest.json"><meta name="theme-color" content="#0b1222"><link rel="icon" href="/icon192.png"><link rel="apple-touch-icon" href="/icon192.png"><meta name="apple-mobile-web-app-capable" content="yes">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
@@ -182,6 +183,7 @@ body.touch details{display:none}body.touch #menu{padding-left:3vw}body.touch .cu
 body.touch #spec{bottom:auto;top:46px;font-size:11px;padding:4px 12px;max-width:62vw;text-align:center}body.touch #ammo{right:auto;left:50%;transform:translateX(-50%);bottom:97px;display:flex;gap:8px;align-items:baseline;white-space:nowrap;font-size:17px}body.touch #wname{font-size:10px}
 #bEmote{right:calc(170px + env(safe-area-inset-right));top:56px;width:44px;height:44px;font-size:10px}
 #bEdit{right:calc(222px + env(safe-area-inset-right));top:56px;width:44px;height:44px;font-size:10px}
+#bDrop{right:calc(274px + env(safe-area-inset-right));top:56px;width:44px;height:44px;font-size:10px}
 body.touch #team{left:calc(10px + env(safe-area-inset-left));top:46%;width:150px;padding:4px 8px 6px}body.touch #team .tn{font-size:11px}body.touch .modes button{font-size:13px;padding:5px 18px}body.touch #useL{top:calc(60% - 22px);font-size:12px}body.touch #lobbyV{font-size:12px}
 body.touch #storm{top:158px;right:calc(8px + env(safe-area-inset-right));width:150px;font-size:10px;padding:4px 7px}body.touch #picks{top:36%;font-size:10px}body.touch .chips span{font-size:11px;padding:5px 10px}body.touch .chips span b{font-size:17px}body.touch #lowammo{font-size:12px}
 body.touch .keys{display:none}body.touch .thint{display:block;font-weight:600;font-size:12px;line-height:1.6;margin-top:10px;opacity:.9;max-width:520px}
@@ -241,6 +243,7 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
   <div class="tb" id="bCrouch">DUCKEN</div>
   <div class="tb" id="bEmote">TANZ</div>
   <div class="tb" id="bEdit">EDIT</div>
+  <div class="tb" id="bDrop">DROP</div>
 </div>
 <canvas id="bigmap" width="700" height="700"></canvas>
 <div id="score"></div>
@@ -257,15 +260,15 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
         <div><button data-c="head-">◀</button><span id="cHead">Helm</span><button data-c="head+">▶</button></div>
         <div><button data-c="skin-">◀</button><span>Haut</span><button data-c="skin+">▶</button></div>
       </div>
-      <div class="row"><button class="sbtn" id="openSet">⚙ Einstellungen</button><a class="sbtn" id="getApp" href="/app" style="display:none;text-decoration:none;margin-left:8px">📱 Android-App</a></div>
+      <div class="row"><button class="sbtn" id="openSet">⚙ Einstellungen</button><a class="sbtn" id="getApp" href="/app" style="display:none;text-decoration:none;margin-left:8px">📱 Android-App</a><button class="sbtn" id="getPC" style="display:none;margin-left:8px">💻 PC-App installieren</button></div>
       <button class="btn" id="play">Spielen</button>
       <details class="keys0"><summary>Steuerung anzeigen (Tasten änderbar unter ⚙)</summary>
       <div class="keys">
-        <div><b>WASD</b>Laufen (Auto-Sprint) · <b>Shift</b>Gehen</div><div><b>Leertaste</b>Springen / Handbremse</div>
-        <div><b>Strg</b>Ducken / beim Sprinten Rutschen · <b>B</b>Tanzen</div><div><b>Linksklick</b>Schießen / Werfen / Bauen</div>
+        <div><b>WASD</b>Laufen · <b>Strg</b>Sprinten (halten)</div><div><b>Leertaste</b>Springen / Handbremse</div>
+        <div><b>Shift</b>Ducken / beim Sprinten Rutschen · <b>B</b>Tanzen</div><div><b>Linksklick</b>Schießen / Werfen / Bauen</div>
         <div><b>Rechtsklick</b>Zielen / Material</div><div><b>1–6</b><b>Mausrad</b>Inventar</div>
         <div><b>Q</b>Wand <b>F</b>Boden <b>C</b>Rampe <b>V</b>Dach · <b>G</b>Wand bearbeiten</div><div><b>E</b>Aufheben / Truhe / Auto</div>
-        <div><b>R</b>Nachladen · <b>M</b>Karte · <b>T</b>Markieren</div><div><b>Tab</b>Spielerliste · <b>E halten</b>Wiederbeleben / Reboot</div><div><b>P</b>Einstellungen</div><div><b>Leertaste in der Luft</b>Gleiter öffnen · gegen Kanten springen: Klettern</div>
+        <div><b>R</b>Nachladen · <b>X</b>Fallen lassen · <b>M</b>Karte · <b>T</b>Markieren</div><div><b>Tab</b>Spielerliste · <b>E halten</b>Wiederbeleben / Reboot</div><div><b>P</b>Einstellungen</div><div><b>Leertaste in der Luft</b>Gleiter öffnen · gegen Kanten springen: Klettern</div>
       </div></details>
       <div class="thint">Links wischen: Laufen / Fahren · Rechts wischen: Umsehen · FEUER: Schießen, Werfen, Abbauen, Bauen · Auto-Feuer (abschaltbar unter ⚙ Einstellungen) · Inventar, Bauteile, Karte und Hinweise antippen</div>
     </div>
@@ -279,5 +282,11 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
 <script src="shared.js"></script>
 <script type="module" src="game.js"></script>
 <script>if(/Android/i.test(navigator.userAgent)&&!/SturmfallApp/.test(navigator.userAgent))document.getElementById('getApp').style.display='inline-block';</script>
+<script>
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+let instP=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();instP=e;document.getElementById('getPC').style.display='inline-block';});
+document.getElementById('getPC').onclick=()=>{if(instP){instP.prompt();instP.userChoice.finally(()=>{instP=null;document.getElementById('getPC').style.display='none';});}};
+addEventListener('appinstalled',()=>{document.getElementById('getPC').style.display='none';});
+</script>
 </body>
 </html>

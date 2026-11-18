@@ -3,3 +3,4 @@ android/app/build/
 android/build/
 android/local.properties
 node_modules
+tools/node_modules

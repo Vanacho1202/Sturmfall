@@ -7,10 +7,10 @@ const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
 const TOTAL = +process.env.TOTAL || 100, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
 const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
-const OT = ['tree', 'rock', 'crate', 'barrel'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
+const OT = ['tree', 'rock', 'crate', 'barrel', 'prop'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
 // ---------- Webserver
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.mp3': 'audio/mpeg', '.apk': 'application/vnd.android.package-archive', '.json': 'application/json', '.svg': 'image/svg+xml' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.png': 'image/png', '.mp3': 'audio/mpeg', '.apk': 'application/vnd.android.package-archive', '.json': 'application/json', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
 const gzCache = new Map();
 const server = http.createServer((req, res) => {
   let u;
@@ -116,7 +116,10 @@ function addPiece(p, ann, grow) {
 function hitPiece(key, dmg) {
   const p = world.pieces.get(key); if (!p) return false;
   p.hp -= dmg;
-  if (p.hp <= 0) { world.pieces.delete(key); world.pg.remove(p); world.growing.delete(p); broadcast({ t: 'pc-', k: key }); }
+  if (p.hp <= 0) {
+    world.pieces.delete(key); world.pg.remove(p); world.growing.delete(p); broadcast({ t: 'pc-', k: key });
+    if (p.t === 'f' && world.onFloor) { const l = world.onFloor.get(key); if (l) { for (const o of l) if (world.objs.delete(o.id)) broadcast({ t: 'obj-', id: o.id }); world.onFloor.delete(key); } }
+  }
   else broadcastNear({ t: 'pchp', k: key, hp: Math.round(p.hp) }, (p.ix + 0.5) * G, (p.iz + 0.5) * G, 160);
   return true;
 }
@@ -136,9 +139,119 @@ const PT = {
   camp: { want: 3, w: [2, 2], s: [1, 1], mats: { wood: 1 } },
   fort: { want: 4, w: [3, 3], s: [2, 3], mats: { stone: 1 } },
 };
+// ---------- Requisiten (Kenney-Modelle, CC0): Einrichtung, Stadt, Hafen, Industrie, Natur
+const PJ = JSON.parse(fs.readFileSync(path.join(PUB, 'props', 'props.json'), 'utf8')), PR = {};
+PJ.forEach((m, i) => (PR[m.n] = { ...m, i }));
+function addProp(name, x, z, yaw = 0, y = null, on = null, grid = true) {
+  const d = PR[name]; if (!d) return null;
+  const q = d.c === 'b' || d.c === 's' ? ((Math.round(yaw / (Math.PI / 2)) % 4) + 4) % 4 : -1, ya = q >= 0 ? q * Math.PI / 2 : yaw;
+  const sw = q % 2 === 1, hx = (sw ? d.s[2] : d.s[0]) / 2, hz = (sw ? d.s[0] : d.s[2]) / 2;
+  const o = { id: world.oid++, t: 'prop', p: d.i, n: name, x: r1(x), z: r1(z), y: r2(y == null ? S.height(x, z) : y), yaw: r2(ya), s: 1, hp: d.hp || 1e9, c: d.c, hx: r2(hx), hz: r2(hz), h: d.s[1], on };
+  o.r = d.c === 'r' ? Math.max(hx, hz) * 0.7 : d.c === 'b' ? Math.max(hx, hz) : 0;
+  world.objs.set(o.id, o);
+  if (on) { if (!world.onFloor.has(on)) world.onFloor.set(on, []); world.onFloor.get(on).push(o); }
+  return o;
+}
+const ROOMS = {
+  living: [['sofa', 2], ['ctable', 1], ['tvcab', 2], ['plant', 0], ['lamp', 0], ['books', 2], ['rug', 1]],
+  bedroom: [['bed', 2], ['lamp', 0], ['shelf', 2], ['plant', 0], ['rug', 1], ['bedS', 2]],
+  kitchen: [['fridge', 2], ['stove', 2], ['cabinet', 2], ['sink', 2], ['table', 1], ['chair', 1]],
+  bath: [['tub', 2], ['toilet', 2], ['washer', 2], ['plant', 0]],
+  office: [['desk', 2], ['deskChair', 1], ['shelf', 2], ['boxes', 0], ['plant', 0]],
+  storage: [['boxes', 0], ['boxes', 0], ['shelf', 2], ['sbox', 2], ['pbarrel', 0]],
+};
+// Möbel in ein Stockwerk stellen: an die Wände, Treppe/Tür/Truhe frei lassen
+function furnish(cx, cz, w, d, iy, st, kind, reserved) {
+  const list = ROOMS[kind], cells = [];
+  for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) if (!reserved.has(i + ',' + j)) cells.push([i, j]);
+  for (let k = cells.length - 1; k > 0; k--) { const r = rnd(k + 1); [cells[k], cells[r]] = [cells[r], cells[k]]; }
+  const y = iy * H + (st ? 0.12 : 0.02), n = Math.min(cells.length, list.length, 2 + rnd(3));
+  for (let k = 0; k < n; k++) {
+    const [i, j] = cells[k], [name, mode] = list[k], dm = PR[name]; if (!dm) continue;
+    let x = (cx + i + 0.5) * G, z = (cz + j + 0.5) * G, yaw = 0;
+    if (mode === 2) { // an die nächste Außenwand
+      const opts = []; if (i === 0) opts.push([-1, 0]); if (i === w - 1) opts.push([1, 0]); if (j === 0) opts.push([0, -1]); if (j === d - 1) opts.push([0, 1]);
+      if (!opts.length) opts.push([[-1, 0], [1, 0], [0, -1], [0, 1]][rnd(4)]);
+      const [ox, oz] = opts[rnd(opts.length)], depth = dm.s[2] / 2;
+      x += ox * (G / 2 - depth - 0.2); z += oz * (G / 2 - depth - 0.2); yaw = Math.atan2(-ox, -oz);
+    } else if (mode === 1) yaw = rnd(4) * Math.PI / 2;
+    else { x += (Math.random() - 0.5) * 2; z += (Math.random() - 0.5) * 2; yaw = Math.random() * 6.28; }
+    addProp(name, x, z, yaw, y, st ? S.pkey({ t: 'f', ix: cx + i, iy, iz: cz + j }) : null);
+  }
+}
+const sideOf = (x, z, w, d) => [x, z];
+function nearRoad(poi, rmin, rmax, dmin, dmax, tries = 60) {
+  for (let t = 0; t < tries; t++) {
+    const a = Math.random() * 6.283, r = rmin + Math.random() * (rmax - rmin), x = poi.x + Math.cos(a) * r, z = poi.z + Math.sin(a) * r, rd = S.roadDist(x, z);
+    if (rd > dmin && rd < dmax && S.height(x, z) > 0.4) return [x, z];
+  }
+  return null;
+}
+function roadYaw(x, z) { const e = 1.5, gx = S.roadDist(x + e, z) - S.roadDist(x - e, z), gz = S.roadDist(x, z + e) - S.roadDist(x, z - e); return Math.atan2(gx, gz); }
+// Ortsgestaltung je nach Art des Ortes
+function decorate(poi, free, rects) {
+  const P = (n, pr = 0) => { const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * (poi.r + pr); return [poi.x + Math.cos(a) * r, poi.z + Math.sin(a) * r]; };
+  const ok = (x, z, hw, pad = 0.5, road = 3.5) => S.height(x, z) > 0.4 && S.roadDist(x, z) > road && free(x / G - hw / G, z / G - hw / G, 2 * hw / G, 2 * hw / G, pad);
+  const block = (x, z, hw) => rects.push({ cx: x / G - hw / G, cz: z / G - hw / G, w: 2 * hw / G, d: 2 * hw / G });
+  const put = (name, n, rr, opts = {}) => {
+    for (let i = 0, t = 0; i < n && t < n * 25; t++) {
+      const [x, z] = opts.at ? opts.at() || [1e9, 1e9] : P(name, rr); if (x > 1e8) continue;
+      const d = PR[name]; if (!d) return; const hw = Math.max(d.s[0], d.s[2]) / 2 + (opts.pad ?? 0.4);
+      if (!ok(x, z, opts.noFree ? 0.01 : hw, 0.3, opts.road ?? 3.5)) continue;
+      const yaw = opts.yaw ? opts.yaw(x, z) : rnd(4) * Math.PI / 2;
+      addProp(name, x, z, yaw, opts.y ? opts.y(x, z) : null); if (!opts.noBlock) block(x, z, hw); i++;
+    }
+  };
+  const t = poi.t, lampAt = () => nearRoad(poi, 0, poi.r + 30, 4.2, 5.6), roadSide = (x, z) => roadYaw(x, z);
+  if (t === 'city') {
+    put(pick(['sky1', 'sky2', 'sky3', 'sky4', 'sky5']), 1, 0, { at: () => P(0, 14), pad: 2 });
+    for (let k = 0; k < 4; k++) put(pick(['sky1', 'sky2', 'sky3', 'sky4', 'sky5', 'shopA', 'shopC', 'shopE', 'shopH']), 1, 16, { pad: 2 });
+    put('light', 12, 0, { at: lampAt, yaw: roadSide, noBlock: 1 }); put(pick(['sedan', 'taxi', 'police', 'suv', 'van']), 3, 0, { at: () => nearRoad(poi, 0, poi.r + 10, 3.6, 5), yaw: roadSide });
+    put('taxi', 2, 0, { at: () => nearRoad(poi, 0, poi.r + 10, 3.6, 5), yaw: roadSide }); put('dumpster', 4, 0); put('parasol', 4, 0); put('hydrant', 4, 0, { noBlock: 1 }); put('barrier', 4, 0); put('ccone', 8, 0, { noBlock: 1 }); put('stop', 3, 0, { at: lampAt, noBlock: 1 }); put('planter', 4, 0);
+  } else if (t === 'town') {
+    put('lightC', 7, 0, { at: lampAt, yaw: roadSide, noBlock: 1 }); put('planter', 6, 0); put('gfence', 10, 0, { yaw: () => rnd(4) * Math.PI / 2 });
+    put(pick(['sedan', 'suv', 'van', 'truck']), 2, 0, { at: () => nearRoad(poi, 0, poi.r + 10, 3.6, 5), yaw: roadSide }); put('sedan', 2, 0); put('flowers', 10, 0, { noBlock: 1 }); put('flowersY', 8, 0, { noBlock: 1 }); put('dumpster', 1, 0); put('plant', 3, 0, { noBlock: 1 });
+  } else if (t === 'farm') {
+    put('windmill', 1, 4, { pad: 1.5 }); put('wtower', 1, 4, { pad: 1 }); put('tractor', 2, 0); put('pumpkin', 10, 6, { noBlock: 1 });
+    for (let f = 0; f < 3; f++) { // Felder mit Reihen
+      for (let tries = 0; tries < 40; tries++) {
+        const [x0, z0] = P(0, 6), nx = 4 + rnd(3), nz = 4 + rnd(3), sp = 3.4, crop = pick(['corn', 'corn', 'wheat']);
+        const hw = Math.max(nx, nz) * sp / 2 + 1; if (!ok(x0, z0, hw, 0.5)) continue;
+        for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) { const x = x0 + (a - nx / 2 + 0.5) * sp, z = z0 + (b - nz / 2 + 0.5) * sp; addProp('dirt', x, z, 0); addProp(crop, x + (Math.random() - 0.5) * 0.6, z + (Math.random() - 0.5) * 0.6, Math.random() * 6.28); }
+        for (let a = 0; a < nx; a++) { addProp('hfence', x0 + (a - nx / 2 + 0.5) * sp, z0 - nz * sp / 2 - 0.8, 0); addProp('hfence', x0 + (a - nx / 2 + 0.5) * sp, z0 + nz * sp / 2 + 0.8, 0); }
+        block(x0, z0, hw); break;
+      }
+    }
+    put('logs', 4, 0); put('fence', 8, 4, { yaw: () => rnd(4) * Math.PI / 2 });
+  } else if (t === 'factory') {
+    for (let k = 0; k < 14; k++) put(pick(['cont1', 'cont2', 'cont3']), 1, 4, { pad: 0.6 });
+    // gestapelte Container
+    for (let k = 0, tr = 0; k < 4 && tr < 60; tr++) { const [x, z] = P(0, 2); if (!ok(x, z, 4.6, 0.5)) continue; const yaw = rnd(2) * Math.PI / 2, n = pick(['cont1', 'cont2', 'cont3']); addProp(n, x, z, yaw); addProp(pick(['cont1', 'cont2', 'cont3']), x, z, yaw, S.height(x, z) + PR[n].s[1]); block(x, z, 4.6); k++; }
+    put('tankL', 2, 6, { pad: 1 }); put('tank', 3, 4); put('chimney', 2, 8, { pad: 1 }); put(pick(['hall', 'hall2']), 1, 18, { pad: 2 }); put('solar', 2, 8); put('delivery', 1, 0); put('garbage', 1, 0); put('barrier', 5, 0); put('ccone', 8, 0, { noBlock: 1 }); put('wtower', 1, 10, { pad: 1 }); put('dumpster', 2, 0);
+  } else if (t === 'harbor') {
+    // Stege am Ufer: Punkt an Land, Richtung Wasser
+    for (let k = 0, tr = 0; k < 4 && tr < 300; tr++) {
+      const a = Math.random() * 6.283, r = poi.r * 0.4 + Math.random() * (poi.r + 40), x = poi.x + Math.cos(a) * r, z = poi.z + Math.sin(a) * r, h = S.height(x, z);
+      if (h < 0.1 || h > 1.2) continue;
+      let best = null; for (let q = 0; q < 8; q++) { const b2 = q * Math.PI / 4, wx = x + Math.sin(b2) * 7, wz = z + Math.cos(b2) * 7; if (S.height(wx, wz) < -1.5) { best = b2; break; } }
+      if (best == null) continue; const yaw = Math.round(best / (Math.PI / 2)) * Math.PI / 2, dx = Math.sin(yaw), dz = Math.cos(yaw);
+      for (let s2 = 0; s2 < 3; s2++) addProp('dock', x + dx * (2 + s2 * 5.3), z + dz * (2 + s2 * 5.3), yaw, 1.0 - 2.9);
+      addProp('rowboat', x + dx * 9 + dz * 4.5, z + dz * 9 - dx * 4.5, yaw + 0.4, -0.35); k++;
+    }
+    for (let k = 0, tr = 0; k < 1 && tr < 200; tr++) { const a = Math.random() * 6.283, r = poi.r + 30 + Math.random() * 50, x = poi.x + Math.cos(a) * r, z = poi.z + Math.sin(a) * r; if (S.height(x, z) > -6 || S.height(x + 8, z + 8) > -4 || S.height(x - 8, z - 8) > -4) continue; addProp('ship', x, z, Math.random() * 6.28, -1.6); k++; }
+    put('pcrate', 8, 0); put('pbarrel', 8, 0); put('palm', 6, 10, { noBlock: 1 }); put('palmB', 4, 10, { noBlock: 1 }); put('cannon', 2, 0); put('flag', 2, 0); put(pick(['cont1', 'cont2']), 3, 0); put('lightC', 4, 0, { at: lampAt, yaw: roadSide, noBlock: 1 });
+  } else if (t === 'camp') {
+    for (let k = 0; k < 5; k++) { const a = k / 5 * 6.283 + Math.random() * 0.4, x = poi.x + Math.cos(a) * poi.r * 0.55, z = poi.z + Math.sin(a) * poi.r * 0.55; if (ok(x, z, 2.4, 0.3, 2)) { addProp(k % 2 ? 'tent' : 'tentC', x, z, Math.atan2(poi.x - x, poi.z - z)); block(x, z, 2.4); } }
+    addProp('camp', poi.x + 3, poi.z + 2, 0); put('bedroll', 4, -poi.r * 0.3, { noBlock: 1 }); put('bench', 2, 0); put('sbox', 4, 0); put('logs', 3, 0); put('fishrack', 1, 0); put('sign', 2, 6);
+    for (let k = 0; k < 16; k++) { const a = k / 16 * 6.283, x = poi.x + Math.cos(a) * (poi.r + 3), z = poi.z + Math.sin(a) * (poi.r + 3); if (k % 5 === 2 || S.height(x, z) < 0.3 || S.roadDist(x, z) < 4) continue; addProp('palisade', x, z, Math.round((a + Math.PI / 2) / (Math.PI / 2)) * Math.PI / 2); }
+  } else if (t === 'fort') {
+    for (let k = 0; k < 18; k++) { const a = k / 18 * 6.283, x = poi.x + Math.cos(a) * (poi.r - 2), z = poi.z + Math.sin(a) * (poi.r - 2); if (S.height(x, z) < 0.3) continue; if (k === 0) { addProp('gate', x, z, Math.atan2(poi.x - x, poi.z - z)); continue; } if (S.roadDist(x, z) < 4 || !free(x / G - 0.6, z / G - 0.6, 1.2, 1.2, 0)) continue; addProp('wall', x, z, Math.atan2(poi.x - x, poi.z - z)); }
+    put('tower', 2, -4, { pad: 1 }); put('cannon', 4, 0); put('flag', 3, 0); put('pbarrel', 5, 0); put('pcrate', 4, 0); put('column', 3, 10);
+  }
+}
 function ringPos(rmax, rmin = 0) { const a = Math.random() * 6.283, r = rmin + Math.sqrt(Math.random()) * (rmax - rmin); return [Math.cos(a) * r, Math.sin(a) * r]; }
 function genWorld() {
-  world = { objs: new Map(), chests: new Map(), pieces: new Map(), pg: new S.PGrid(), loot: new Map(), cars: new Map(), houses: [], grid: new Map(), vans: [], cards: new Map(), gas: [], growing: new Set(), oid: 1 };
+  world = { objs: new Map(), chests: new Map(), pieces: new Map(), pg: new S.PGrid(), loot: new Map(), cars: new Map(), houses: [], grid: new Map(), vans: [], cards: new Map(), gas: [], growing: new Set(), oid: 1, onFloor: new Map() };
   const nid = () => world.oid++;
   const rects = [];
   const free = (cx, cz, w, d, pad) => !rects.some((h) => cx < h.cx + h.w + pad && cx + w + pad > h.cx && cz < h.cz + h.d + pad && cz + d + pad > h.cz);
@@ -172,6 +285,17 @@ function genWorld() {
       const fl = Math.min(storeys - 1, rnd(storeys)), ci = w - 1, cj = rnd(d);
       const ch = { id: nid(), x: (cx + ci + 0.5) * G, y: (poi.l + fl) * H + (fl ? 0.12 : 0), z: (cz + cj + 0.5) * G, open: 0, k: 'c' };
       world.chests.set(ch.id, ch);
+      { // Einrichtung
+        const kinds = poi.t === 'factory' ? ['office', 'storage'] : poi.t === 'fort' || poi.t === 'camp' ? ['storage'] : poi.t === 'harbor' ? ['storage', 'kitchen', 'bedroom'] : ['living', 'kitchen', 'bedroom', 'bath', 'office'];
+        for (let st = 0; st < storeys; st++) {
+          const res = new Set();
+          if (st === 0) { res.add(door + ',0'); res.add('0,0'); }
+          if (st < storeys - 1 || st > 0) { res.add('0,' + (d - 1)); res.add('0,' + (d - 2)); res.add('1,' + (d - 1)); }
+          if (st === fl) res.add(ci + ',' + cj);
+          if (big) for (let i = 1; i < 4; i++) res.add(i + ',0');
+          furnish(cx, cz, w, d, poi.l + st, st, kinds[(st + rnd(kinds.length)) % kinds.length], res);
+        }
+      }
       if (big) for (let s2 = 1; s2 < storeys; s2 += 1) { const c2 = { id: nid(), x: (cx + 1 + (s2 % 3) + 0.5) * G, y: (poi.l + s2) * H + 0.12, z: (cz + 0.5) * G, open: 0, k: 'c' }; world.chests.set(c2.id, c2); }
       if (Math.random() < 0.45 && w > 1) { const ab = { id: nid(), x: (cx + 0.5) * G, y: poi.l * H, z: (cz + 0.5) * G, open: 0, k: 'a' }; world.chests.set(ab.id, ab); }
       if (Math.random() < 0.8) {
@@ -192,6 +316,7 @@ function genWorld() {
       if (!free(x / G - 1, z / G - 1, 2, 2, 0.5)) continue;
       addCar(nid(), x, z); i++;
     }
+    decorate(poi, free, rects);
   }
   // Rückkehr-Stationen am Rand einiger Orte
   S.POIS.forEach((p, i) => {
@@ -226,6 +351,14 @@ function genWorld() {
     if (S.height(x, z) < 0.3 || S.poiAt(x, z, 2)) continue;
     world.objs.set(world.oid, { id: nid(), t: 'rock', x: r1(x), z: r1(z), s: r2(0.7 + Math.random() * 0.9), hp: 150 });
   }
+  const scatter = (name, n, cond, ymode) => { for (let i = 0, t = 0; i < n && t < n * 6; t++) { const [x, z] = ringPos(S.R * 0.93), h = S.height(x, z); if (!cond(h, x, z) || S.poiAt(x, z, 4) || S.roadDist(x, z) < 4) continue; addProp(name, x, z, Math.random() * 6.28, ymode === 'water' ? -0.05 : null); i++; } };
+  const land = (h) => h > 1 && h < 18;
+  scatter('stump', 260, land); scatter('log', 160, land); scatter('mush', 260, land); scatter('flowers', 300, land); scatter('flowersY', 260, land); scatter('flowersP', 220, land); scatter('bush2', 300, land);
+  scatter('rockT', 50, (h) => h > 4); scatter('rockL', 50, (h) => h > 2); scatter('palm', 70, (h) => h > 0.3 && h < 1.6); scatter('palmB', 50, (h) => h > 0.3 && h < 1.6); scatter('cactus', 30, (h) => h > 0.3 && h < 1.2);
+  scatter('lily', 120, (h, x, z) => h < -0.3 && h > -2.5 && Math.hypot(x, z) < S.R * 0.8, 'water');
+  for (let k = 0; k < 6; k++) { const [x0, z0] = ringPos(S.R * 0.8, 100); if (S.height(x0, z0) < 2 || S.poiAt(x0, z0, 20)) continue; addProp('obelisk', x0, z0, 0); for (let c = 0; c < 6; c++) { const a = c / 6 * 6.283; addProp('column', x0 + Math.cos(a) * 9, z0 + Math.sin(a) * 9, Math.random() * 6.28); } }
+  // Strommasten und Laternen an den Straßen außerhalb der Orte
+  for (let i = 0, t = 0; i < 160 && t < 3000; t++) { const [x, z] = ringPos(S.R * 0.9), rd = S.roadDist(x, z); if (rd < 5.5 || rd > 7 || S.height(x, z) < 0.5 || S.poiAt(x, z, 10)) continue; addProp('pole', x, z, roadYaw(x, z)); i++; }
   for (let i = 0; i < 40; i++) { const [x, z] = ringPos(S.R * 0.85); if (S.height(x, z) > 1.5 && !S.poiAt(x, z, 4)) addCar(nid(), x, z); }
   for (let i = 0; i < 300; i++) {
     const [x, z] = ringPos(S.R * 0.88);
@@ -243,7 +376,8 @@ function genWorld() {
   for (const o of [...world.objs.values()]) {
     const cx = o.x / G, cz = o.z / G;
     if ((o.t === 'tree' || o.t === 'rock') && (S.roadDist(o.x, o.z) < 4.5 || rects.some((r) => cx > r.cx - 0.6 && cx < r.cx + r.w + 0.6 && cz > r.cz - 1.6 && cz < r.cz + r.d + 0.6))) { world.objs.delete(o.id); continue; }
-    o.r = o.t === 'tree' ? 0.45 * o.s : o.t === 'rock' ? 1.25 * o.s : o.t === 'crate' ? 0.75 * o.s : 0.55;
+    if (o.t === 'prop') { if (o.c !== 'b' && o.c !== 'r') continue; if (!o.on && S.roadDist(o.x, o.z) < 2.4 && o.h < 4) { world.objs.delete(o.id); continue; } }
+    else o.r = o.t === 'tree' ? 0.45 * o.s : o.t === 'rock' ? 1.25 * o.s : o.t === 'crate' ? 0.75 * o.s : 0.55;
     const k = Math.floor(o.x / 16) + ',' + Math.floor(o.z / 16);
     if (!world.grid.has(k)) world.grid.set(k, []); world.grid.get(k).push(o);
   }
@@ -251,7 +385,7 @@ function genWorld() {
 const packChest = (c) => { const o = { id: c.id, x: r2(c.x), y: r2(c.y), z: r2(c.z), open: c.open, k: c.k }; if (c.k === 'd') { o.sp = r1(c.sp); o.land = r1(c.land); } return o; };
 const packCard = (c) => ({ id: c.id, x: r2(c.x), y: r2(c.y), z: r2(c.z), o: c.o, team: c.team });
 const packWorld = () => ({
-  objs: [...world.objs.values()].map((o) => [o.id, OT.indexOf(o.t), o.x, o.z, o.s]), chests: [...world.chests.values()].map(packChest),
+  objs: [...world.objs.values()].map((o) => (o.t === 'prop' ? [o.id, 4, o.x, o.z, 1, o.p, o.yaw, o.y, o.on ? 1 : 0] : [o.id, OT.indexOf(o.t), o.x, o.z, o.s])), chests: [...world.chests.values()].map(packChest),
   pieces: [...world.pieces.values()].map((p) => [PTY.indexOf(p.t), p.ix, p.iy, p.iz, p.t === 'w' ? p.d : p.rot | 0, MT.indexOf(p.mat), p.v | 0]),
   loot: [...world.loot.values()], houses: world.houses, vans: world.vans, cards: [...world.cards.values()].map(packCard),
   cars: [...world.cars.values()].map((c) => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v, hue: c.hue, drv: c.drv })),
@@ -309,7 +443,8 @@ function damage(target, amount, attacker, wname, head, kb) {
     return;
   }
   if (target.bot && !target.down && attacker && attacker !== target && target.st === 'ground') {
-    target.threat = attacker; target.threatT = gameT + 5;
+    target.threat = attacker; target.threatT = gameT + 5; target.lastHurt = gameT;
+    if (target.healT > gameT) target.healT = 0;
     if (gameT >= target.nextWall && wname !== 'pick' && wname !== 'car' && Math.random() < 0.45 * target.skill) { target.nextWall = gameT + 4 + Math.random() * 5; botWall(target, attacker); }
   }
 }
@@ -402,7 +537,7 @@ function resetEnt(e) {
 function makeBot(name) {
   const b = { id: nextId++, bot: true, name, hue: rnd(360), style: rnd(16),
     st: 'ship', jumpAt: 3 + Math.random() * 46, tx: 0, tz: 0, wx: 0, wz: 0, wpn: null, armAt: 0, nextShot: 0, tgt: null, nextScan: Math.random(), strafe: 1, nextStrafe: 0, nextWp: 0, nextHack: 0,
-    skill: 0.55 + Math.random() * 0.6, jy: 0, jv: 0, stuck: 0, detourT: 0, detourA: 0, swT: 0, coverT: 0, relT: 0, relDone: false, emoteT: 0, mag: 0, burst: 4, threat: null, threatT: 0, nextWall: 0, seen: null, chest: null, nextChest: 0,
+    skill: 0.55 + Math.random() * 0.6, jy: 0, jv: 0, stuck: 0, detourT: 0, detourA: 0, swT: 0, coverT: 0, relT: 0, relDone: false, emoteT: 0, mag: 0, burst: 4, threat: null, threatT: 0, nextWall: 0, seen: null, chest: null, nextChest: 0, heals: rnd(2), nades: 0, healT: 0, healK: null, nextNade: 0, lastHurt: 0, boxed: 0,
     ox: (Math.random() - 0.5) * 6, oz: (Math.random() - 0.5) * 6, lead: null };
   resetEnt(b);
   return b;
@@ -457,11 +592,15 @@ function los(a, e, d) {
   const dx = e.x - a.x, dy = e.y + 1.2 - (a.y + 1.5), dz = e.z - a.z, l = Math.hypot(dx, dy, dz) || 1;
   return !world.pg.ray(a.x, a.y + 1.5, a.z, dx / l, dy / l, dz / l, l);
 }
-function blockedObj(x, z) {
+function blockedObj(x, z, y) {
   const gx = Math.floor(x / 16), gz = Math.floor(z / 16);
   for (let a = gx - 1; a <= gx + 1; a++) for (let b = gz - 1; b <= gz + 1; b++) {
     const arr = world.grid.get(a + ',' + b); if (!arr) continue;
-    for (const o of arr) { if (!world.objs.has(o.id)) continue; const r = o.r + 0.4, dx = x - o.x, dz = z - o.z; if (dx * dx + dz * dz < r * r) return true; }
+    for (const o of arr) {
+      if (!world.objs.has(o.id)) continue; const dx = x - o.x, dz = z - o.z;
+      if (o.t === 'prop') { if (y != null && (o.y > y + 1.8 || o.y + o.h < y + 0.3)) continue; if (o.c === 'b') { if (Math.abs(dx) < o.hx + 0.4 && Math.abs(dz) < o.hz + 0.4) return true; continue; } }
+      const r = o.r + 0.4; if (dx * dx + dz * dz < r * r) return true;
+    }
   }
   for (const c of world.cars.values()) { const dx = x - c.x, dz = z - c.z; if (dx * dx + dz * dz < 4.4) return true; }
   return false;
@@ -480,9 +619,15 @@ function moveBot(b, dx, dz, speed, dt, noHack) {
   }
   const nx = b.x + dx * step, nz = b.z + dz * step;
   if (S.height(nx, nz) < 0.15) { if (!b.down) newWaypoint(b, true); if (!(b.detourT > gameT)) { b.detourT = gameT + 1.2; b.detourA = Math.PI * (0.6 + Math.random() * 0.8); } return false; }
-  if (blockedObj(nx, nz)) { if (!(b.detourT > gameT)) { b.detourT = gameT + 0.45; b.detourA = (Math.random() < 0.5 ? 1 : -1) * 1.25; } return false; }
+  if (blockedObj(nx, nz, b.y)) { if (!(b.detourT > gameT)) { b.detourT = gameT + 0.45; b.detourA = (Math.random() < 0.5 ? 1 : -1) * 1.25; } return false; }
   b.x = nx; b.z = nz; b.stuck = Math.max(0, b.stuck - dt * 2);
   return true;
+}
+function botBoom(b, x, y, z) {
+  if (phase !== 'game') return;
+  broadcastNear({ t: 'boom', x, y, z }, x, z, 320);
+  forNear(x, z, 8, (e) => { if (!e.alive || (e.fl & 1)) return; const d = Math.hypot(e.x - x, e.y + 0.9 - y, e.z - z); if (d < 6.5) damage(e, (12 + 98 * (1 - d / 6.5)) * (e.bot ? 0.6 : 1), b, 'gren', false, [(e.x - x) / (d || 1) * 10, 7.5, (e.z - z) / (d || 1) * 10]); });
+  for (const p of [...world.pieces.values()]) if (Math.abs((p.ix + 0.5) * G - x) < 6 && Math.abs((p.iz + 0.5) * G - z) < 6 && Math.hypot((p.ix + 0.5) * G - x, (p.iy + 0.5) * H - y, (p.iz + 0.5) * G - z) < 5) hitPiece(p.key, 330);
 }
 function armBot(b, w, r) { b.wpn = { w, r }; b.w = w; b.wr = r; b.mag = S.W[w].mag; b.burst = 3 + rnd(5); }
 function botWall(b, a) {
@@ -560,15 +705,43 @@ function botTick(b, dt) {
     if (th && th.alive && b.threatT > gameT && th !== best && th.team !== b.team) { const d = Math.hypot(th.x - b.x, th.y - b.y, th.z - b.z); if (d < 95 && los(b, th, d)) best = th; }
     if (best !== b.tgt) { b.tgt = best; b.nextShot = Math.max(b.nextShot, gameT + (0.6 + Math.random() * 0.5) / b.skill); }
     if (best) b.seen = { x: best.x, z: best.z, t: gameT };
-    if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 5) { newWaypoint(b, true); b.chest = null; }
-    if (!b.wpn && !b.chest && gameT >= b.nextChest) {
-      b.nextChest = gameT + 3; let cd = 75;
+    if (Math.hypot(b.x - storm.x, b.z - storm.z) > storm.r - 5 || (storm.nr && !storm.shrink && storm.timer < 25 + b.skill * 10 && Math.hypot(b.x - storm.nx, b.z - storm.nz) > storm.nr - 8 && b.toNext !== storm.i)) { newWaypoint(b, true); b.toNext = storm.i; b.chest = null; }
+    if ((!b.wpn || (b.wpn.r < 3 && !best)) && !b.chest && gameT >= b.nextChest) {
+      b.nextChest = gameT + 3; let cd = b.wpn ? 32 : 75;
       for (const ch of world.chests.values()) { if (ch.open || (ch.bot && ch.bot !== b.id) || Math.abs(ch.y - S.height(ch.x, ch.z)) > 0.5) continue; const d = Math.hypot(ch.x - b.x, ch.z - b.z); if (d < cd) { cd = d; b.chest = ch; } }
       if (b.chest) b.chest.bot = b.id;
     }
   }
   const t = b.tgt, crouchNow = b.coverT > gameT, reloading = b.relT > gameT;
   let fl = 0;
+  // Heilen (mit Animation), nur wenn gerade niemand schießt
+  if (b.healT > gameT) {
+    if (t && t.alive && gameT - b.lastHurt < 1) b.healT = 0;
+    else { b.fl = 8192 | (b.boxed > gameT ? 8 : 0); b.w = b.healK; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
+  } else if (b.healK) {
+    if (b.healK === 'med') b.hp = 100; else b.sh = Math.min(100, b.sh + 50);
+    b.healK = null; b.heals = Math.max(0, b.heals - 1);
+  }
+  if (b.heals > 0 && !b.healK && gameT - b.lastHurt > (t ? 6 : 2.5) && (b.hp < 70 || (b.sh < 50 && !t))) {
+    b.healK = b.hp < 70 ? 'med' : 'pot'; b.healT = gameT + (b.healK === 'med' ? 6 : 3.5);
+  }
+  // wenig Leben im Kampf: Kasten bauen und heilen
+  if (t && b.hp < 45 && b.heals > 0 && b.boxed < gameT - 15 && Math.random() < 0.6 * b.skill) {
+    b.boxed = gameT + 7; const pcx = Math.floor(b.x / G), pcz = Math.floor(b.z / G), iy = Math.floor((b.y - b.jy + 0.4) / H), mat = Math.random() < 0.5 ? 'stone' : 'wood';
+    for (const p of [{ t: 'w', d: 0, ix: pcx, iz: pcz }, { t: 'w', d: 0, ix: pcx, iz: pcz + 1 }, { t: 'w', d: 1, ix: pcx, iz: pcz }, { t: 'w', d: 1, ix: pcx + 1, iz: pcz }, { t: 'c', ix: pcx, iz: pcz, iy: iy + 1 }]) addPiece({ ...p, iy: p.iy ?? iy, mat }, true, true);
+    b.x = (pcx + 0.5) * G; b.z = (pcz + 0.5) * G; b.healK = 'med'; b.healT = gameT + 6; b.coverT = gameT + 6;
+  }
+  // Granate werfen, wenn der Gegner hinter Deckung steckt
+  if (t && t.alive && b.nades > 0 && gameT >= b.nextNade && b.wpn) {
+    const dx = t.x - b.x, dz = t.z - b.z, d = Math.hypot(dx, dz);
+    if (d > 8 && d < 30 && !los(b, t, d) && Math.random() < 0.5) {
+      b.nades--; b.nextNade = gameT + 6 + Math.random() * 5; b.swT = gameT + 0.3;
+      const ft = 0.6 + d / 30, o = [r2(b.x), r2(b.y + 1.6), r2(b.z)], v = [r2(dx / ft), r2((t.y - b.y - 0.4) / ft + 10 * ft), r2(dz / ft)];
+      broadcastNear({ t: 'nade', id: b.id, k: 'gren', o, v }, b.x, b.z, 260);
+      const tx = t.x + (Math.random() - 0.5) * 3, tz = t.z + (Math.random() - 0.5) * 3, ty = S.height(tx, tz);
+      world.timers = world.timers || []; world.timers.push({ at: gameT + 2.4, f: () => botBoom(b, tx, ty + 0.3, tz) });
+    }
+  }
   if (b.relDone && !reloading) { b.relDone = false; b.mag = S.W[b.wpn.w].mag; }
   if (b.emoteT > gameT && !t) { b.fl = 256; b.pitch = 0; b.y = S.height(b.x, b.z) + b.jy; return; }
   if (t && t.alive && b.wpn) {
@@ -593,7 +766,8 @@ function botTick(b, dt) {
       if (clear) for (let i = 0; i < W.pellets; i++) if (Math.random() < p) n++;
       const miss = n ? 0 : 1.5, ty = t.y + (t.down ? 0.35 : 1.2);
       broadcastNear({ t: 'shot', id: b.id, o: [r1(b.x), r1(b.y + 1.4), r1(b.z)], e: [r1(t.x + (Math.random() - 0.5) * miss * 2), r1(ty + (Math.random() - 0.3) * miss), r1(t.z + (Math.random() - 0.5) * miss * 2)], w: b.wpn.w }, b.x, b.z, 230);
-      if (n) damage(t, S.wdmg(b.wpn.w, b.wpn.r, d3, false) * n * (t.bot ? 0.6 : 1), b, b.wpn.w, false);
+      const head = n > 0 && W.pellets === 1 && Math.random() < 0.12 * b.skill;
+      if (n) damage(t, S.wdmg(b.wpn.w, b.wpn.r, d3, head) * n * (t.bot ? 0.6 : 1), b, b.wpn.w, head);
       else if (!clear) { const l = d3 || 1, h = world.pg.ray(b.x, b.y + 1.5, b.z, dx / l, (ty - b.y - 1.5) / l, dz / l, l); if (h) hitPiece(h.key, W.dmg * W.pellets * 0.5); }
     }
   } else if (t && t.alive && !b.wpn && Math.hypot(t.x - b.x, t.z - b.z) < 9) {
@@ -610,7 +784,7 @@ function botTick(b, dt) {
     if (mate && mate.down) { gx = mate.x; gz = mate.z; sp = 5.8; mateGoal = true; }
     else if (van) { gx = van.x; gz = van.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 3.5) startReboot(b, van); }
     else if (card) { gx = card.x; gz = card.z; sp = 5.8; mateGoal = true; if (Math.hypot(gx - b.x, gz - b.z) < 2.5) { world.cards.delete(card.id); b.card = card.o; broadcast({ t: 'card-', id: card.id, by: b.id }); } }
-    else if (!b.wpn && b.chest && !b.chest.open) { gx = b.chest.x; gz = b.chest.z; sp = 5.8; }
+    else if (b.chest && !b.chest.open) { gx = b.chest.x; gz = b.chest.z; sp = 5.8; }
     else if (b.seen && gameT - b.seen.t < 4 && b.wpn) { gx = b.seen.x; gz = b.seen.z; sp = 5.6; }
     else if (mate && Math.hypot(mate.x - b.x, mate.z - b.z) > 22) { gx = mate.x + b.ox; gz = mate.z + b.oz; sp = 5.8; mateGoal = true; }
     else if (b.chest) b.chest = null;
@@ -618,9 +792,11 @@ function botTick(b, dt) {
     if (mate && mate.down && d < 2.2) startRevive(b, mate);
     else if (!mateGoal && b.chest && d < 2.3) {
       const items = openChest(b.chest), w = items.find((i) => i.k === 'w' && i.w !== 'rpg');
-      if (w) armBot(b, w.w, w.r); else if (!b.wpn) armBot(b, 'pistol', 0);
+      if (w && (!b.wpn || w.r > b.wpn.r)) armBot(b, w.w, w.r); else if (!b.wpn) armBot(b, 'pistol', 0);
       if (items.some((i) => i.c === 'pot' || i.c === 'mini')) b.sh = Math.min(100, b.sh + 50);
-      scatter(items.filter((i) => i !== w && i.c !== 'pot' && i.c !== 'mini'), b.chest.x, b.chest.y, b.chest.z, true);
+      for (const i of items) { if (i.c === 'band' || i.c === 'med' || i.c === 'chug') b.heals = Math.min(4, b.heals + 1); if (i.c === 'gren') b.nades = Math.min(3, b.nades + (i.n || 1)); }
+      if (w && b.wpn && w.r <= b.wpn.r && w.w !== b.wpn.w) scatter([w], b.chest.x, b.chest.y, b.chest.z, true);
+      scatter(items.filter((i) => i !== w && i.c !== 'pot' && i.c !== 'mini' && i.c !== 'band' && i.c !== 'med' && i.c !== 'chug' && i.c !== 'gren'), b.chest.x, b.chest.y, b.chest.z, true);
       b.chest = null;
     } else if (!mateGoal && (d < 2.5 || gameT >= b.nextWp)) { if (!b.chest) newWaypoint(b); b.seen = null; }
     else if (d > 1.2) { b.yaw = Math.atan2(-dx, -dz); moveBot(b, dx, dz, sp, dt); }
@@ -661,7 +837,7 @@ setInterval(() => {
       if (phase === 'lobby' && tickN % 4 === 0) { const d = hs.filter((c) => c.mode === 'duo').length; broadcast({ t: 's', ph: 'lobby', tm: Math.ceil(lobbyT), names: hs.map((c) => c.name), mode, v: [hs.length - d, d] }); }
       return;
     }
-    if (!hs.length) { toLobby(); return; }
+    if (!hs.length || !hs.some((c) => c.inMatch)) { toLobby(); return; }
     if (phase === 'end') { endT -= dt; if (endT <= 0) { toLobby(); return; } }
     rebuildGrid();
     if (phase === 'game') {
@@ -670,6 +846,7 @@ setInterval(() => {
       for (const b of bots) if (b.alive) botTick(b, dt);
       tickDowned(dt);
       tickWorld(dt);
+      if (world.timers && world.timers.length) { const due = world.timers.filter((x) => x.at <= gameT); world.timers = world.timers.filter((x) => x.at > gameT); for (const x of due) try { x.f(); } catch (e) { console.error(e); } }
       stormAcc += dt;
       if (stormAcc >= 1) {
         stormAcc -= 1;
@@ -703,6 +880,8 @@ function onMsg(c, m) {
     if (c.joined) return;
     c.name = String(m.name || '').replace(/[<>&"'\\]/g, '').trim().slice(0, 14) || 'Spieler' + c.id;
     c.joined = true; c.hue = Math.min(359, Math.max(0, m.hue | 0)); c.style = (m.style | 0) & 15; c.mode = m.mode === 'duo' ? 'duo' : 'solo';
+    // Läuft nur noch eine Runde mit Bots (kein Mensch mehr drin)? Dann gleich neue Runde statt Zuschauen.
+    if (phase !== 'lobby' && ![...clients.values()].some((o) => o !== c && o.joined && o.inMatch && o.alive)) toLobby();
     send(c, { t: 'init', id: c.id, phase, mode: phase !== 'lobby' ? matchMode : mode, world: phase !== 'lobby' ? packWorld() : null, ship, roster: phase !== 'lobby' ? roster() : [] });
     return;
   }
@@ -739,10 +918,11 @@ function onMsg(c, m) {
       if (!up) return;
       const now = Date.now(); if (now - c.lastHarvest < 300) return; c.lastHarvest = now;
       if (m.k === 'o') {
-        const o = world.objs.get(m.id | 0); if (!o || Math.hypot(o.x - c.x, o.z - c.z) > 8) return;
+        const o = world.objs.get(m.id | 0); if (!o || Math.hypot(o.x - c.x, o.z - c.z) > 8 + (o.hx || 0)) return;
+        if (o.t === 'prop' && !PJ[o.p].hp) return;
         o.hp -= 34;
-        const mat = o.t === 'tree' || o.t === 'crate' ? 'wood' : o.t === 'rock' ? 'stone' : 'metal';
-        send(c, { t: 'mat', m: mat, n: o.t === 'tree' ? 20 : 15 });
+        const mat = o.t === 'prop' ? PJ[o.p].m : o.t === 'tree' || o.t === 'crate' ? 'wood' : o.t === 'rock' ? 'stone' : 'metal';
+        send(c, { t: 'mat', m: mat, n: o.t === 'tree' ? 20 : o.t === 'prop' ? 12 : 15 });
         if (o.hp <= 0) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
       } else if (m.k === 'p') {
         const p = world.pieces.get(String(m.key)); if (!p) return;

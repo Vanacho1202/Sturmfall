@@ -72,19 +72,22 @@ const GUN = {
   hunt:   [0.26, 3000, 0.95, 105, 34, 0.3, 1700, 1.0],
 };
 // ---------------- Echte Aufnahmen (public/snd)
-const SMP = {}, SFILES = ['ar', 'smg', 'pistol', 'shotgun', 'pump', 'sniper', 'bolt'];
+const SMP = {}, SFILES = ['ar', 'ar2', 'ar3', 'smg', 'smg2', 'smg3', 'pistol', 'pistol2', 'pistol3', 'shotgun', 'pump', 'sniper', 'bolt'];
 function loadSamples() {
   for (const k of SFILES) fetch('/snd/' + k + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => b && new Promise((res, rej) => C.decodeAudioData(b, res, rej))).then((buf) => { if (buf) SMP[k] = buf; }).catch(() => {});
 }
 // Waffe -> Aufnahme, Lautstärke, Tonhöhe
-const GMAP = { ar: ['ar', 0.8, 1], smg: ['smg', 0.6, 1], pistol: ['pistol', 0.75, 1], shotgun: ['shotgun', 1, 1], tac: ['shotgun', 0.9, 1.12], sniper: ['sniper', 1, 1], hunt: ['sniper', 0.85, 1.12] };
+const GMAP = { ar: ['ar', 0.95, 1], smg: ['smg', 0.72, 1], pistol: ['pistol', 0.88, 1], shotgun: ['shotgun', 1.15, 1], tac: ['shotgun', 1.05, 1.12], sniper: ['sniper', 1.15, 1], hunt: ['sniper', 1, 1.12] };
+let rr = 0;
 function sample(k, p, vol, rate, o) {
-  const buf = SMP[k]; if (!buf) return false;
+  const vs = [k, k + '2', k + '3'].filter((x) => SMP[x]), buf = vs.length ? SMP[vs[rr++ % vs.length]] : null; if (!buf) return false;
   const src = C.createBufferSource(), g = C.createGain(); src.buffer = buf; src.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
   g.gain.value = vol; src.connect(g); g.connect(out(p, o)); src.start(); return true;
 }
 export function gun(w, p) {
-  if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) { const m = GMAP[w], far = p && dist(p) > 150; sample(m[0], p, m[1] * (far ? 1.3 : 1), m[2] * (far ? 0.94 : 1), { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.06, revD: 220 }); return; }
+  if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) { const m = GMAP[w], far = p && dist(p) > 150; sample(m[0], p, m[1] * (far ? 1.3 : 1), m[2] * (far ? 0.94 : 1), { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.06, revD: 220 });
+    if (!p) { const g = GUN[w], t = C.currentTime, o = out(null); os(o, t, g[5] * 0.9, g[3] * 0.8, 38, { vol: g[2] * 0.55 }); nz(o, t, 0.02, 7000, { type: 'highpass', vol: g[2] * 0.25 }); }
+    return; }
   if (!ok(p, 600)) return; const g = GUN[w]; if (!g) return rocketLaunch(p);
   const t = C.currentTime, d = dist(p), o = out(p, { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.12, revD: 220 }), far = d > 120;
   nz(o, t, g[0] * (far ? 1.6 : 1), far ? 1400 : g[1], { vol: g[2], f2: 300, q: 0.5 });
