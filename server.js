@@ -713,9 +713,12 @@ function botTick(b, dt) {
   if (b.rev) { const v = b.rev.v; b.yaw = Math.atan2(-(v.x - b.x), -(v.z - b.z)); b.fl = 8; b.w = 'none'; b.pitch = -0.4; b.y = S.height(b.x, b.z); return; }
   if (gameT >= b.nextScan) {
     b.nextScan = gameT + 0.45;
-    let best = null, bd = 55;
-    forNear(b.x, b.z, 55, (e) => {
-      if (e === b || !e.alive || e.team === b.team || (e.fl & 7)) return;
+    // Anfangsphase: erst looten, Bots kämpfen untereinander noch nicht (spart auch Server-Leistung)
+    if (b.calmUntil == null) b.calmUntil = 100 + Math.random() * 80;
+    const calm = gameT < b.calmUntil, rr = calm ? 28 : 55;
+    let best = null, bd = rr;
+    forNear(b.x, b.z, rr, (e) => {
+      if (e === b || !e.alive || e.team === b.team || (e.fl & 7) || (calm && e.bot)) return;
       const d = Math.hypot(e.x - b.x, e.y - b.y, e.z - b.z) + (e.down ? 12 : 0);
       if (d < bd && los(b, e, d)) { bd = d; best = e; }
     });
