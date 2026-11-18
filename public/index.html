@@ -34,6 +34,9 @@ html,body{height:100%;overflow:hidden;position:fixed;inset:0;touch-action:none;o
 #lobby .big{font-size:30px;font-weight:800;font-style:italic;letter-spacing:2px;text-transform:uppercase}
 #lobbyT{font-size:92px;font-weight:900;font-style:italic;color:var(--y);line-height:1;text-shadow:0 6px 0 rgba(0,0,0,.35)}
 #lobbyN{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:640px;margin-top:14px}
+#lobby{pointer-events:auto}#lobbyN .lbh{width:100%;font-weight:900;font-size:12px;letter-spacing:2px;opacity:.7}#lobbyN .lbp.me{border-color:var(--y)}#lobbyN .lbp.team{background:rgba(89,183,255,.3);border-color:#59b7ff}
+.lbi{margin-left:8px;font:800 12px var(--f);padding:3px 10px;border-radius:12px;border:none;background:var(--y);color:#111;cursor:pointer}.lbi:disabled{background:#3ecf4a}.lbt{width:100%;margin-top:6px;font-weight:700}
+#invite{position:fixed;z-index:40;top:18%;left:50%;transform:translateX(-50%);display:none;background:rgba(12,18,34,.95);border:2px solid var(--y);border-radius:14px;padding:14px 22px;font-weight:700;font-size:17px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5)}#invite div{margin-top:10px;display:flex;gap:10px;justify-content:center}#invite .btn{font-size:15px;padding:8px 18px;width:auto;min-width:0}#invite .btn.dark{background:#444;color:#fff}
 #lobbyN span{background:var(--glass);border:1px solid rgba(255,255,255,.2);padding:5px 14px;border-radius:20px;font-weight:700;font-size:14px}
 #dead,#win{pointer-events:none;justify-content:flex-start;padding-top:11vh;background:linear-gradient(180deg,rgba(0,0,0,.55),rgba(0,0,0,0) 45%)}
 #dead .leave,#win .leave{pointer-events:auto;position:fixed;right:24px;bottom:24px;padding:12px 26px;font-size:18px;width:auto;min-width:0}
@@ -276,6 +279,7 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
 </div>
 <div class="ov" id="rotate">📱↻<br>Bitte das Gerät quer drehen</div>
 <div class="ov" id="lobby"><div class="big">Nächste Runde startet in</div><div id="lobbyT">–</div><div id="lobbyV"></div><div class="modes lobbym"><button data-mode="solo">SOLO</button><button data-mode="duo">DUO</button></div><div id="lobbyN"></div></div>
+<div id="invite"></div>
 <div class="ov" id="dead"><div class="big" id="deadT"></div><div class="small" id="deadS"></div><button class="btn leave" id="leaveD">Verlassen</button></div>
 <div class="ov" id="win"><div class="big" id="winT"></div><div class="small" id="winS"></div><button class="btn leave" id="leaveW">Verlassen</button></div>
 <script type="importmap">{"imports":{"three":"/lib/three.module.js"}}</script>
@@ -284,8 +288,10 @@ body.touch #bigmap{width:92vh;max-width:92vh;max-height:92vh}
 <script>if(/Android/i.test(navigator.userAgent)&&!/SturmfallApp/.test(navigator.userAgent))document.getElementById('getApp').style.display='inline-block';</script>
 <script>
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
-let instP=null;addEventListener('beforeinstallprompt',e=>{e.preventDefault();instP=e;document.getElementById('getPC').style.display='inline-block';});
-document.getElementById('getPC').onclick=()=>{if(instP){instP.prompt();instP.userChoice.finally(()=>{instP=null;document.getElementById('getPC').style.display='none';});}};
+let instP=null;const pcb=document.getElementById('getPC');const standalone=matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches;
+if(!standalone&&!/Android|iPhone|iPad|SturmfallApp/i.test(navigator.userAgent)&&!matchMedia('(pointer: coarse)').matches)pcb.style.display='inline-block';
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();instP=e;pcb.style.display='inline-block';});
+pcb.onclick=()=>{if(instP){instP.prompt();instP.userChoice.finally(()=>{instP=null;});}else alert(/Edg\//.test(navigator.userAgent)?'Edge: oben rechts ··· → Apps → „Sturmfall installieren“':'Chrome: oben rechts ⋮ → „Streamen, speichern und teilen“ → „Seite als App installieren“ (oder das Installieren-Symbol in der Adressleiste)');};
 addEventListener('appinstalled',()=>{document.getElementById('getPC').style.display='none';});
 </script>
 </body>

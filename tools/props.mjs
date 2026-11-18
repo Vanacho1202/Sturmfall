@@ -20,32 +20,32 @@ export const CAT = {
   van: ['car-kit/van', 1.8, 'b', 320, 'metal'], truck: ['car-kit/truck', 1.8, 'b', 350, 'metal'], fire: ['car-kit/firetruck', 1.9, 'b', 400, 'metal'], ambu: ['car-kit/ambulance', 1.8, 'b', 380, 'metal'],
   garbage: ['car-kit/garbage-truck', 1.8, 'b', 400, 'metal'], delivery: ['car-kit/delivery', 1.8, 'b', 380, 'metal'], tractor: ['car-kit/tractor', 1.9, 'b', 300, 'metal'], cone: ['car-kit/cone', 1.4, 0, 10, 'metal'],
   // Stadt
-  sky1: ['city-kit-commercial/building-skyscraper-a', 11, 'b', 0, 'stone'], sky2: ['city-kit-commercial/building-skyscraper-b', 11, 'b', 0, 'stone'], sky3: ['city-kit-commercial/building-skyscraper-c', 11, 'b', 0, 'stone'],
-  sky4: ['city-kit-commercial/building-skyscraper-d', 10, 'b', 0, 'stone'], sky5: ['city-kit-commercial/building-skyscraper-e', 11, 'b', 0, 'stone'],
-  shopA: ['city-kit-commercial/building-a', 10, 'b', 0, 'stone'], shopC: ['city-kit-commercial/building-c', 10, 'b', 0, 'stone'], shopE: ['city-kit-commercial/building-e', 10, 'b', 0, 'stone'], shopH: ['city-kit-commercial/building-h', 10, 'b', 0, 'stone'],
-  parasol: ['city-kit-commercial/detail-parasol-a', 8, 0, 30, 'wood'], light: ['city-kit-roads/light-square', 9, 'r', 0, 'metal'], lightC: ['city-kit-roads/light-curved', 9, 'r', 0, 'metal'],
-  dumpster: ['city-kit-roads/dumpster', 6, 'b', 200, 'metal'], pole: ['city-kit-roads/electricity-pole', 12, 'r', 0, 'wood'], stop: ['city-kit-roads/road-sign-stop', 6, 'r', 0, 'metal'],
+  sky1: ['city-kit-commercial/building-skyscraper-a', 11, 'b', 2400, 'stone'], sky2: ['city-kit-commercial/building-skyscraper-b', 11, 'b', 2800, 'stone'], sky3: ['city-kit-commercial/building-skyscraper-c', 11, 'b', 2600, 'stone'],
+  sky4: ['city-kit-commercial/building-skyscraper-d', 10, 'b', 3000, 'stone'], sky5: ['city-kit-commercial/building-skyscraper-e', 11, 'b', 2600, 'stone'],
+  shopA: ['city-kit-commercial/building-a', 10, 'b', 1500, 'stone'], shopC: ['city-kit-commercial/building-c', 10, 'b', 1400, 'stone'], shopE: ['city-kit-commercial/building-e', 10, 'b', 1600, 'stone'], shopH: ['city-kit-commercial/building-h', 10, 'b', 1500, 'stone'],
+  parasol: ['city-kit-commercial/detail-parasol-a', 8, 0, 30, 'wood'], light: ['city-kit-roads/light-square', 9, 'r', 150, 'metal'], lightC: ['city-kit-roads/light-curved', 9, 'r', 150, 'metal'],
+  dumpster: ['city-kit-roads/dumpster', 6, 'b', 200, 'metal'], pole: ['city-kit-roads/electricity-pole', 12, 'r', 200, 'wood'], stop: ['city-kit-roads/road-sign-stop', 6, 'r', 80, 'metal'],
   barrier: ['city-kit-roads/construction-barrier', 7, 'b', 60, 'metal'], ccone: ['city-kit-roads/construction-cone', 7, 0, 10, 'metal'], hydrant: ['city-kit-roads/construction-light', 6, 0, 30, 'metal'],
   // Industrie
   cont1: ['city-kit-industrial/shipping-container-a', 8.5, 'b', 500, 'metal'], cont2: ['city-kit-industrial/shipping-container-b', 8.5, 'b', 500, 'metal'], cont3: ['city-kit-industrial/shipping-container-c', 8.5, 'b', 500, 'metal'],
-  tankL: ['city-kit-industrial/detail-tank-large', 5, 'b', 0, 'metal'], tank: ['city-kit-industrial/detail-tank', 6, 'b', 400, 'metal'], chimney: ['city-kit-industrial/chimney-large', 7, 'r', 0, 'stone'],
-  wtower: ['city-kit-industrial/water-tower', 7, 'r', 0, 'metal'], windmill: ['city-kit-industrial/windmill', 9, 'r', 0, 'metal'], solar: ['city-kit-industrial/solar-panel-landscape-group', 5, 0, 200, 'metal'],
-  hall: ['city-kit-industrial/building-c', 9, 'b', 0, 'metal'], hall2: ['city-kit-industrial/building-q', 9, 'b', 0, 'metal'],
+  tankL: ['city-kit-industrial/detail-tank-large', 5, 'b', 900, 'metal'], tank: ['city-kit-industrial/detail-tank', 6, 'b', 400, 'metal'], chimney: ['city-kit-industrial/chimney-large', 7, 'r', 900, 'stone'],
+  wtower: ['city-kit-industrial/water-tower', 7, 'r', 800, 'metal'], windmill: ['city-kit-industrial/windmill', 9, 'r', 700, 'metal'], solar: ['city-kit-industrial/solar-panel-landscape-group', 5, 0, 200, 'metal'],
+  hall: ['city-kit-industrial/building-c', 9, 'b', 1800, 'metal'], hall2: ['city-kit-industrial/building-q', 9, 'b', 1800, 'metal'],
   // Hafen
   dock: ['pirate-kit/structure-platform-dock', 2.2, 's', 0, 'wood'], dockS: ['pirate-kit/structure-platform-dock-small', 2.2, 's', 0, 'wood'], rowboat: ['pirate-kit/boat-row-large', 1.6, 'b', 150, 'wood'],
   ship: ['pirate-kit/ship-medium', 1.5, 'b', 0, 'wood'], pcrate: ['pirate-kit/crate', 1.4, 'b', 80, 'wood'], pbarrel: ['pirate-kit/barrel', 1.1, 'r', 80, 'wood'], palm: ['pirate-kit/palm-detailed-straight', 2.2, 'r', 120, 'wood'],
   palmB: ['pirate-kit/palm-detailed-bend', 2.2, 'r', 120, 'wood'], flag: ['pirate-kit/flag', 2.4, 'r', 60, 'wood'], cannon: ['pirate-kit/cannon', 1.6, 'b', 200, 'metal'],
-  wall: ['pirate-kit/castle-wall', 1.6, 'b', 0, 'stone'], gate: ['pirate-kit/castle-gate', 1.6, 0, 0, 'stone'], tower: ['pirate-kit/tower-watch', 2.0, 'b', 0, 'wood'], srocks: ['pirate-kit/rocks-sand-b', 1.2, 'r', 0, 'stone'],
+  wall: ['pirate-kit/castle-wall', 1.6, 'b', 900, 'stone'], gate: ['pirate-kit/castle-gate', 1.6, 0, 1000, 'stone'], tower: ['pirate-kit/tower-watch', 2.0, 'b', 800, 'wood'], srocks: ['pirate-kit/rocks-sand-b', 1.2, 'r', 400, 'stone'],
   // Lager
   tent: ['nature-kit/tent_detailedOpen', 4.5, 'b', 80, 'wood'], tentC: ['nature-kit/tent_detailedClosed', 4.5, 'b', 80, 'wood'], camp: ['survival-kit/campfire-pit', 6, 0, 0, 'stone'], bedroll: ['survival-kit/bedroll', 5, 0, 20, 'wood'],
   bench: ['survival-kit/workbench', 5.5, 'b', 80, 'wood'], sign: ['survival-kit/signpost', 5, 'r', 40, 'wood'], sbox: ['survival-kit/box-large', 5, 'b', 60, 'wood'], palisade: ['survival-kit/fence-fortified', 6, 'b', 120, 'wood'],
   logs: ['survival-kit/resource-wood', 6, 0, 30, 'wood'], fishrack: ['survival-kit/campfire-fishing-stand', 5, 0, 30, 'wood'],
   // Hof & Natur
-  pumpkin: ['nature-kit/crop_pumpkin', 3, 0, 30, 'wood'], dirt: ['nature-kit/crops_dirtDoubleRow', 4, 0, 0, 'wood'], hfence: ['nature-kit/fence_planks', 4, 0, 40, 'wood'], obelisk: ['nature-kit/statue_obelisk', 4, 'r', 0, 'stone'], column: ['nature-kit/statue_columnDamaged', 4, 'r', 0, 'stone'],
+  pumpkin: ['nature-kit/crop_pumpkin', 3, 0, 30, 'wood'], dirt: ['nature-kit/crops_dirtDoubleRow', 4, 0, 0, 'wood'], hfence: ['nature-kit/fence_planks', 4, 0, 40, 'wood'], obelisk: ['nature-kit/statue_obelisk', 4, 'r', 500, 'stone'], column: ['nature-kit/statue_columnDamaged', 4, 'r', 400, 'stone'],
   corn: ['nature-kit/crops_cornStageD', 2.6, 0, 0, 'wood'], wheat: ['nature-kit/crops_wheatStageB', 2.6, 0, 0, 'wood'], fence: ['nature-kit/fence_simple', 4, 0, 40, 'wood'],
   stump: ['nature-kit/stump_round', 3, 'r', 40, 'wood'], log: ['nature-kit/log', 4, 'b', 60, 'wood'], mush: ['nature-kit/mushroom_red', 3, 0, 0, 'wood'], flowers: ['nature-kit/flower_redA', 3, 0, 0, 'wood'],
   flowersY: ['nature-kit/flower_yellowA', 3, 0, 0, 'wood'], flowersP: ['nature-kit/flower_purpleA', 3, 0, 0, 'wood'], lily: ['nature-kit/lily_large', 4, 0, 0, 'wood'], cactus: ['nature-kit/cactus_tall', 4, 'r', 60, 'wood'],
-  bush2: ['nature-kit/plant_bushLarge', 3, 0, 0, 'wood'], rockT: ['nature-kit/rock_tallA', 4, 'r', 0, 'stone'], rockL: ['nature-kit/rock_largeA', 5, 'b', 0, 'stone'],
+  bush2: ['nature-kit/plant_bushLarge', 3, 0, 0, 'wood'], rockT: ['nature-kit/rock_tallA', 4, 'r', 400, 'stone'], rockL: ['nature-kit/rock_largeA', 5, 'b', 400, 'stone'],
   gfence: ['city-kit-suburban/fence-1x3', 4, 0, 40, 'wood'], planter: ['city-kit-suburban/planter', 5, 'b', 40, 'wood'], path: ['city-kit-suburban/path-stones-long', 7, 0, 0, 'stone'],
 };
 const io = new NodeIO(); const texCache = {};

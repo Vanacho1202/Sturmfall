@@ -82,10 +82,14 @@ let rr = 0;
 function sample(k, p, vol, rate, o) {
   const vs = [k, k + '2', k + '3'].filter((x) => SMP[x]), buf = vs.length ? SMP[vs[rr++ % vs.length]] : null; if (!buf) return false;
   const src = C.createBufferSource(), g = C.createGain(); src.buffer = buf; src.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
-  g.gain.value = vol; src.connect(g); g.connect(out(p, o)); src.start(); return true;
+  g.gain.value = vol; src.connect(g); g.connect(out(p, o)); src.start(C.currentTime + ((o && o.delay) || 0)); return true;
 }
 export function gun(w, p) {
-  if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) { const m = GMAP[w], far = p && dist(p) > 150; sample(m[0], p, m[1] * (far ? 1.3 : 1), m[2] * (far ? 0.94 : 1), { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.06, revD: 220 });
+  if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) {
+    // Entfernung hörbar: Schall braucht Zeit (343 m/s), klingt dumpfer, mehr Hall und ein Echo
+    const m = GMAP[w], d = p ? dist(p) : 0, far = d > 150, delay = Math.min(1.4, d / 343);
+    sample(m[0], p, m[1] * (far ? 1.4 : 1), m[2] * (far ? 0.93 : 1), { ref: 6, roll: 0.72, air: 120, rev: p ? 0.15 : 0.06, revD: 180, delay });
+    if (d > 60) sample(m[0], p, m[1] * Math.min(0.5, d / 400), m[2] * 0.95, { ref: 6, roll: 0.6, air: 70, rev: 0.6, revD: 120, delay: delay + 0.25 + Math.random() * 0.35 });
     if (!p) { const g = GUN[w], t = C.currentTime, o = out(null); os(o, t, g[5] * 0.9, g[3] * 0.8, 38, { vol: g[2] * 0.55 }); nz(o, t, 0.02, 7000, { type: 'highpass', vol: g[2] * 0.25 }); }
     return; }
   if (!ok(p, 600)) return; const g = GUN[w]; if (!g) return rocketLaunch(p);
@@ -106,6 +110,7 @@ export function boom(p, big) {
   if (!ok(p, 900)) return;
   if (SMP.boom_b3) { // echte Aufnahmen (CC0): nah krachend, fern dumpf
     const d = dist(p), o = { ref: 10, roll: 0.6, air: 260, rev: 0.3, revD: 250 };
+    o.delay = Math.min(2, d / 343);
     if (d < 140) { sample(['boom_b2', 'boom_b3', 'boom_b4'][rr++ % 3], p, big ? 1.2 : 1, big ? 0.85 : 1, o); sample('boom_low', p, 0.9, 1, o); }
     else sample('boom_distant', p, 1.3, 1, o);
     return;

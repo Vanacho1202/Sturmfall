@@ -555,8 +555,11 @@ function startMatch() {
   const names = BN.slice().sort(() => Math.random() - 0.5);
   bots = [];
   for (let i = hs.length; i < TOTAL; i++) bots.push(makeBot(names[i % names.length] + (10 + rnd(89))));
-  const all = hs.concat(bots);
+  let all = hs.concat(bots);
   if (matchMode === 'duo') {
+    const used = new Set(), bq = bots.slice(), order = [];
+    for (const h of hs) { if (used.has(h)) continue; used.add(h); order.push(h); const p = h.party && clients.get(h.party); if (p && hs.includes(p) && !used.has(p)) { used.add(p); order.push(p); } else order.push(bq.shift()); }
+    all = order.concat(bq).filter(Boolean);
     for (let i = 0; i < all.length; i += 2) {
       const p = all[i], q = all[i + 1], t = i / 2 + 1; p.team = t; p.mate = q || null;
       if (q) { q.team = t; q.mate = p; if (q.bot && p.bot) { q.lead = p; q.jumpAt = p.jumpAt + 0.4; } }
@@ -572,7 +575,8 @@ function toLobby() {
   broadcast({ t: 'lobby' });
 }
 function lobbyMode(hs) {
-  let d = 0; for (const c of hs) if (c.mode === 'duo') d++;
+  let d = 0; for (const c of hs) if (c.mode === 'duo' || c.party) d++;
+  if (hs.some((c) => c.party)) return 'duo';
   const s = hs.length - d;
   return d > s ? 'duo' : s > d ? 'solo' : hs.length ? hs[0].mode : 'solo';
 }
@@ -834,7 +838,7 @@ setInterval(() => {
       mode = lobbyMode(hs);
       if (hs.length) { lobbyT -= dt; if (lobbyT <= 0) startMatch(); }
       else lobbyT = LOBBY;
-      if (phase === 'lobby' && tickN % 4 === 0) { const d = hs.filter((c) => c.mode === 'duo').length; broadcast({ t: 's', ph: 'lobby', tm: Math.ceil(lobbyT), names: hs.map((c) => c.name), mode, v: [hs.length - d, d] }); }
+      if (phase === 'lobby' && tickN % 4 === 0) { const d = hs.filter((c) => c.mode === 'duo').length; broadcast({ t: 's', ph: 'lobby', tm: Math.ceil(lobbyT), names: hs.map((c) => c.name), pl: hs.map((c) => [c.id, c.name, c.party || 0]), mode, v: [hs.length - d, d] }); }
       return;
     }
     if (!hs.length || !hs.some((c) => c.inMatch)) { toLobby(); return; }
@@ -888,6 +892,15 @@ function onMsg(c, m) {
   if (!c.joined) return;
   if (m.t === 'mode') { c.mode = m.m === 'duo' ? 'duo' : 'solo'; return; }
   if (m.t === 'spec') { c.spec = m.id | 0; return; }
+  if (m.t === 'inv') { const o = clients.get(m.id | 0); if (o && o !== c && o.joined && !o.inMatch && o.party !== c.id) send(o, { t: 'inv', from: c.id, name: c.name }); return; }
+  if (m.t === 'invok') {
+    const o = clients.get(m.id | 0); if (!o || o === c || !o.joined) return;
+    for (const x of [c, o]) { const old = x.party && clients.get(x.party); if (old && old.party === x.id) { old.party = 0; send(old, { t: 'party', id: 0 }); } }
+    c.party = o.id; o.party = c.id; c.mode = o.mode = 'duo';
+    send(c, { t: 'party', id: o.id, name: o.name }); send(o, { t: 'party', id: c.id, name: c.name }); return;
+  }
+  if (m.t === 'invno') { const o = clients.get(m.id | 0); if (o) send(o, { t: 'invno', name: c.name }); return; }
+  if (m.t === 'unparty') { const o = c.party && clients.get(c.party); if (o && o.party === c.id) { o.party = 0; send(o, { t: 'party', id: 0, left: c.name }); } c.party = 0; send(c, { t: 'party', id: 0 }); return; }
   if (phase === 'lobby' || !c.inMatch) return;
   const live = c.alive && phase === 'game', up = live && !c.down;
   switch (m.t) {
@@ -1012,6 +1025,12 @@ function onMsg(c, m) {
       if (car.hp <= 0) explodeCar(car, c);
       break;
     }
+    case 'hitobj': { // Schüsse beschädigen Bäume, Möbel, Gebäude usw. (ohne Material)
+      const W = S.W[m.w], o = world.objs.get(m.id | 0); if (!up || !W || !o || (o.t === 'prop' && !PJ[o.p].hp)) return;
+      o.hp -= S.wdmg(m.w, m.r | 0, 0, false) * Math.min(W.pellets, Math.max(1, m.n | 0)) * 0.6;
+      if (o.hp <= 0) { world.objs.delete(o.id); broadcast({ t: 'obj-', id: o.id }); }
+      break;
+    }
     case 'ram': {
       const tg = ent(m.id | 0), now = Date.now(); if (!up || !c.car || !tg || tg === c || now - c.lastRam < 500) return;
       if (Math.hypot(tg.x - c.x, tg.y - c.y, tg.z - c.z) < 7) { c.lastRam = now; damage(tg, 35, c, 'car'); }
@@ -1035,6 +1054,7 @@ wss.on('connection', (ws) => {
     try { if (c.inMatch && c.alive && phase === 'game') kill(c, null, 'quit'); stopRevive(c); stopReboot(c); releaseCar(c); } catch (e) { console.error(e); }
     clients.delete(c.id);
     if (c.mate && c.mate.mate === c) c.mate.mate = null;
+    const pa = c.party && clients.get(c.party); if (pa && pa.party === c.id) { pa.party = 0; send(pa, { t: 'party', id: 0, left: c.name }); }
   });
   ws.on('error', () => {});
 });

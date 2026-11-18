@@ -942,6 +942,9 @@ function onMsg(m) {
       break;
     }
     case 'roster': setRoster(m.r); break;
+    case 'inv': showInvite(m); break;
+    case 'invno': banner(m.name + ' hat abgelehnt', 2); break;
+    case 'party': party = m.id; partyName = m.name || ''; lobbyList.k = null; if (m.id) { banner('Duo mit ' + m.name + '!', 2.5); SFX.ui('good'); prefMode = 'duo'; setModeUI(); } else if (m.left) banner(m.left + ' hat das Team verlassen', 2); break;
     case 'knock': {
       const v = esc(nameOf(m.v));
       if (m.k === myId) { $('elim').innerHTML = '⬇ NIEDERGESCHLAGEN &nbsp;<b>' + v + '</b>'; $('elim').style.opacity = 1; elimT = 2.2; hitMarker('kill'); SFX.elim(true); }
@@ -984,7 +987,7 @@ function onMsg(m) {
   }
 }
 function onState(m) {
-  if (m.ph === 'lobby') { $('lobbyT').textContent = m.tm; $('lobbyN').innerHTML = m.names.map((n) => '<span>' + esc(n) + '</span>').join(''); if (m.v) $('lobbyV').textContent = 'Nächste Runde: ' + (m.mode === 'duo' ? 'DUO' : 'SOLO') + ' · Stimmen Solo ' + m.v[0] + ' / Duo ' + m.v[1]; return; }
+  if (m.ph === 'lobby') { $('lobbyT').textContent = m.tm; lobbyList(m.pl || m.names.map((n, i) => [0, n, 0])); if (m.v) $('lobbyV').textContent = 'Nächste Runde: ' + (m.mode === 'duo' ? 'DUO' : 'SOLO') + ' · Stimmen Solo ' + m.v[0] + ' / Duo ' + m.v[1]; return; }
   if (stormS && m.st[7] && !stormS[7]) { banner('Der Sturm zieht sich zusammen!', 3.5); SFX.ui('storm'); }
   stormS = m.st; shipS = m.ship; aliveN = m.al; teamsN = m.tl || 0; gameT = m.gt; stateTick++;
   for (const a of m.p) {
@@ -1159,6 +1162,25 @@ $('play').onclick = () => {
 };
 document.querySelectorAll('[data-gfx]').forEach((b) => { b.classList.toggle('sel', b.dataset.gfx === QL); b.addEventListener('click', () => { if (b.dataset.gfx === QL) return; try { localStorage.setItem('sf_gfx', b.dataset.gfx); localStorage.setItem('sf_name', $('name').value.trim()); } catch (e) {} location.reload(); }); });
 try { if (localStorage.getItem('sf_mode') === 'duo') prefMode = 'duo'; } catch (e) {}
+// ---------- Lobby: wer ist online, Duo-Einladungen
+let party = 0, partyName = '';
+function lobbyList(pl) {
+  const key = JSON.stringify(pl) + party; if (lobbyList.k === key) return; lobbyList.k = key;
+  $('lobbyN').innerHTML = '<div class="lbh">ONLINE (' + pl.length + ')</div>' + pl.map(([id, n, p]) => {
+    const meI = id === myId, inv = !meI && id && p !== myId && !party;
+    return '<span class="lbp' + (meI ? ' me' : '') + (p === myId || (meI && party) ? ' team' : '') + '">' + esc(n) + (meI ? ' (du)' : '') + (p === myId ? ' · dein Team' : '') + (inv ? ' <button class="lbi" data-inv="' + id + '">Duo einladen</button>' : '') + '</span>';
+  }).join('') + (party ? '<div class="lbt">Team mit <b>' + esc(partyName) + '</b> <button class="lbi" id="unparty">Team verlassen</button></div>' : '');
+  $('lobbyN').querySelectorAll('[data-inv]').forEach((b) => (b.onclick = (e) => { e.stopPropagation(); tx({ t: 'inv', id: +b.dataset.inv }); b.textContent = 'Eingeladen ✓'; b.disabled = true; SFX.ui('click'); }));
+  if ($('unparty')) $('unparty').onclick = (e) => { e.stopPropagation(); tx({ t: 'unparty' }); };
+}
+function showInvite(m) {
+  const d = $('invite'); d.innerHTML = '<b>' + esc(m.name) + '</b> lädt dich zum <b>DUO</b> ein<div><button class="btn" id="invYes">Annehmen</button><button class="btn dark" id="invNo">Ablehnen</button></div>';
+  d.style.display = 'block'; SFX.ui('drop');
+  const close = () => { d.style.display = 'none'; clearTimeout(showInvite.t); };
+  $('invYes').onclick = (e) => { e.stopPropagation(); tx({ t: 'invok', id: m.from }); close(); };
+  $('invNo').onclick = (e) => { e.stopPropagation(); tx({ t: 'invno', id: m.from }); close(); };
+  clearTimeout(showInvite.t); showInvite.t = setTimeout(close, 30000);
+}
 function setModeUI() { document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('sel', b.dataset.mode === prefMode)); }
 document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { initAudio(); prefMode = b.dataset.mode; try { localStorage.setItem('sf_mode', prefMode); } catch (e) {} setModeUI(); tx({ t: 'mode', m: prefMode }); tone(600, 900, 0.06, 0.06, 'triangle'); }));
 setModeUI();
@@ -1407,14 +1429,16 @@ function tally(h, agg) {
   if (h.kind === 'player') { const q = agg.hits.get(h.id) || { n: 0, head: 0 }; q.n++; if (h.head) q.head++; agg.hits.set(h.id, q); }
   else if (h.kind === 'piece') agg.pcs.set(h.key, (agg.pcs.get(h.key) || 0) + 1);
   else if (h.kind === 'car') agg.cars.set(h.id, (agg.cars.get(h.id) || 0) + 1);
+  else if (h.kind === 'obj') { const o = objs.get(h.id); if (o && (!o.pm || o.pm.hp)) { agg.objs.set(h.id, (agg.objs.get(h.id) || 0) + 1); if (agg.objs.get(h.id) === 1) wobbles.push({ o, t: 0.2 }); } }
   if (h.kind) { const pc = h.kind === 'piece' ? pieces.get(h.key) : null; fx.burst(h.x, h.y, h.z, pc ? MATCOL[pc.mat] : IMPACT[h.kind], h.kind === 'player' ? 5 : 4, 3.2, 0.08, 0.45, 12, true); }
 }
 function sendHits(agg, w, r) {
   for (const [id, q] of agg.hits) tx({ t: 'hit', id, n: q.n, head: q.head * 2 >= q.n ? 1 : 0, w, r });
   for (const [k, n] of agg.pcs) tx({ t: 'hitpc', k, n, w, r });
   for (const [id, n] of agg.cars) tx({ t: 'hitcar', id, n, w, r });
+  for (const [id, n] of agg.objs) tx({ t: 'hitobj', id, n, w, r });
 }
-const newAgg = () => ({ hits: new Map(), pcs: new Map(), cars: new Map() });
+const newAgg = () => ({ hits: new Map(), pcs: new Map(), cars: new Map(), objs: new Map() });
 const bullets = [], nades = [];
 function fire(it, now) {
   const W = S.W[it.w];
