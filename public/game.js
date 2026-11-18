@@ -1466,9 +1466,9 @@ const IMPACT = { terrain: '#9a8a60', obj: '#7a5a34', car: '#ffd76a', player: '#f
 function aimDir(out) { const p = VP(), y = VY(), cp = Math.cos(p); return out.set(-Math.sin(y) * cp, Math.sin(p), -Math.cos(y) * cp); }
 function curSpread(it) {
   const W = S.W[it.w];
-  const ads = me.ads ? (SNIP.has(it.w) ? 0 : W.pellets > 1 ? 0.7 : 0.14) : 1;
-  let s = W.spread * ads * (me.crouch ? 0.75 : 1) * (me.speed > 1 ? (me.ads ? 1.15 : 1.35) : 1) * (me.onGround ? 1 : 1.7);
-  if (me.bloom === 0 && me.speed < 1 && me.onGround && W.pellets === 1 && !SNIP.has(it.w)) s *= 0.3; // erster Schuss genau
+  const ads = me.ads ? (SNIP.has(it.w) ? 0 : W.pellets > 1 ? 0.65 : 0.08) : 0.85;
+  let s = W.spread * ads * (me.crouch ? 0.75 : 1) * (me.speed > 1 ? (me.ads ? 1.1 : 1.25) : 1) * (me.onGround ? 1 : 1.7);
+  if (me.bloom < 0.004 && me.speed < 1.5 && me.onGround && W.pellets === 1 && !SNIP.has(it.w)) s *= me.ads ? 0 : 0.25; // erster Schuss genau (beim Zielen exakt)
   return s + me.bloom * (me.ads ? 0.22 : 1);
 }
 function tally(h, agg) {
@@ -1505,7 +1505,7 @@ function fire(it, now) {
   for (let i = 0; i < W.pellets; i++) {
     const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * sp;
     const d = dir.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(u2, Math.sin(a) * r).normalize();
-    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 2600 : 2300; // praktisch sofort am Ziel bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
+    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 2600 : 2300; /* praktisch sofort am Ziel */ bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
     const h = raycast(o.x, o.y, o.z, d.x, d.y, d.z, 500);
     if (!end) end = [h.x, h.y, h.z];
     tally(h, agg);
@@ -1519,7 +1519,7 @@ function fire(it, now) {
   sendHits(agg, it.w, it.r);
   // Rückstoß + Streuungszuwachs
   rec.tp += W.rec * (me.ads ? 0.7 : 1) * (me.crouch ? 0.8 : 1); rec.ty += (Math.random() - 0.5) * W.rec * 0.7;
-  me.bloom = Math.min(0.05, me.bloom + W.bloom);
+  me.bloom = Math.min(0.038, me.bloom + W.bloom * (me.ads ? 0.75 : 1));
   shake = Math.max(shake, W.rec * 0.25);
 }
 function updateBullets(dt) {
@@ -1703,7 +1703,7 @@ function pollPad(dt) {
 function updateMe(dt, now) {
   rec.p += (rec.tp - rec.p) * Math.min(1, dt * 28); rec.y += (rec.ty - rec.y) * Math.min(1, dt * 28);
   const dk = Math.exp(-dt * 5.5); rec.tp *= dk; rec.ty *= dk;
-  me.bloom = Math.max(0, me.bloom - dt * (performance.now() - me.lastShot > 250 ? 0.09 : 0.02));
+  me.bloom = Math.max(0, me.bloom - dt * (performance.now() - me.lastShot > 200 ? 0.14 : 0.03));
   if (!mouseL) me.useLock = false;
   if (me.emote > 0) me.emote -= dt;
   const jump = jumpEdge; jumpEdge = false;
