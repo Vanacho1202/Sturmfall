@@ -15,6 +15,12 @@ const gzCache = new Map();
 const server = http.createServer((req, res) => {
   let u;
   try { u = decodeURIComponent(req.url.split('?')[0]); } catch (e) { res.writeHead(400); res.end(); return; }
+  if (u === '/status') { // wer ist online (nur Namen, keine Daten)
+    const hs = [...clients.values()].filter((c) => c.joined);
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ phase, zeit: Math.round(gameT), menschen: hs.map((c) => ({ name: c.name, imMatch: !!c.inMatch, lebt: !!c.alive })), lebendGesamt: phase === 'game' ? entList.filter((e) => e.alive).length : 0 }));
+    return;
+  }
   if (u === '/') u = '/index.html';
   if (u === '/health') { res.end('ok'); return; }
   if (u === '/app' || u === '/apk' || u === '/download') u = '/Sturmfall.apk';
