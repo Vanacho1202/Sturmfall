@@ -1,18 +1,20 @@
 // Sturmfall – Einstellungen (Spiel, Steuerung, Tasten, Audio, Grafik, Knöpfe)
 const TOUCH0 = matchMedia('(pointer: coarse)').matches || /[?&]touch=1/.test(location.search);
 const DEF = {
-  v: 2, fullscreen: true, auto: TOUCH0, sens: 1, ads: 0.6, scope: 0.22, invY: false, fov: 72, shake: true, bob: true, dmgNum: true, crouchToggle: true, autoSprint: false,
-  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft' }, hud: {}, hudScale: 1, hudAlpha: 0.85, shad: true,
+  v: 3, fullscreen: true, auto: TOUCH0, sens: 1, ads: 0.6, scope: 0.22, invY: false, fov: 72, shake: true, bob: true, dmgNum: true, crouchToggle: true, autoSprint: false,
+  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, hudScale: 1, hudAlpha: 0.85, shad: true,
 };
 export const ACTIONS = [
   ['KeyW', 'Vorwärts'], ['KeyS', 'Rückwärts'], ['KeyA', 'Links'], ['KeyD', 'Rechts'], ['Space', 'Springen / Gleiter'], ['ControlLeft', 'Ducken / Rutschen'], ['ShiftLeft', 'Sprinten (halten)'],
   ['KeyR', 'Nachladen'], ['KeyE', 'Benutzen / Aufheben'], ['KeyX', 'Gegenstand fallen lassen'], ['KeyQ', 'Wand'], ['KeyF', 'Boden'], ['KeyC', 'Rampe'], ['KeyV', 'Dach'], ['KeyG', 'Wand bearbeiten'],
-  ['KeyM', 'Karte'], ['KeyT', 'Markieren'], ['KeyB', 'Tanzen'], ['Tab', 'Spielerliste'], ['KeyP', 'Einstellungen'],
+  ['KeyH', 'Inventar sortieren'], ['KeyM', 'Karte'], ['KeyT', 'Markieren'], ['KeyB', 'Tanzen'], ['Tab', 'Spielerliste'], ['KeyP', 'Einstellungen'],
 ];
 export const CFG = JSON.parse(JSON.stringify(DEF));
 try { const s = JSON.parse(localStorage.getItem('sf_cfg') || '{}'); for (const k in s) if (k in DEF) CFG[k] = typeof DEF[k] === 'object' && !Array.isArray(DEF[k]) ? { ...DEF[k], ...s[k] } : s[k]; } catch (e) {}
+// Version 3: G = fallen lassen, X = Wand bearbeiten (wenn nicht selbst belegt)
+if (CFG.v === 2) { CFG.v = 3; if (!CFG.binds.KeyX && !CFG.binds.KeyG) { CFG.binds.KeyX = 'KeyG'; CFG.binds.KeyG = 'KeyX'; } }
 // Umstellung auf Version 2: Shift = Ducken, Strg = Sprinten, kein Auto-Sprint am PC
-if (!(CFG.v >= 2)) { CFG.v = 2; if (!Object.keys(CFG.binds).length) CFG.binds = { ...DEF.binds }; CFG.autoSprint = false; if (CFG.fullscreen == null) CFG.fullscreen = true; }
+if (!(CFG.v >= 2)) { CFG.v = 3; if (!Object.keys(CFG.binds).length) CFG.binds = { ...DEF.binds }; CFG.autoSprint = false; if (CFG.fullscreen == null) CFG.fullscreen = true; }
 try { const o = +localStorage.getItem('sf_sens'); if (!localStorage.getItem('sf_cfg') && o >= 0.3 && o <= 3) CFG.sens = o; if (localStorage.getItem('sf_shad') === '0') CFG.shad = false; } catch (e) {}
 export function save() { try { localStorage.setItem('sf_cfg', JSON.stringify(CFG)); } catch (e) {} }
 
@@ -153,7 +155,7 @@ export function openSettings() { if (open) return; open = true; render(); $('set
 export function closeSettings() { if (!open) return; open = false; waitKey = null; $('settings').classList.remove('on'); ctx.onClose && ctx.onClose(); ctx.sfx && ctx.sfx.ui('click'); }
 
 // ---------- Touch-Knöpfe verschieben
-const HB = ['bFire', 'bFire2', 'bJump', 'bAds', 'bRel', 'bCrouch', 'bEmote', 'bEdit', 'bDrop'];
+const HB = ['bFire', 'bFire2', 'bJump', 'bAds', 'bRel', 'bCrouch', 'bEmote', 'bEdit', 'bDrop', 'bInv'];
 const base = {};
 export function applyHud() {
   for (const id of HB) {

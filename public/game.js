@@ -725,12 +725,8 @@ function renderBars() {
 function renderHud() {
   hudDirty = false; renderBars();
   let h = '<div data-slot="0" class="slot pk' + (me.slot === 0 && !me.build ? ' sel' : '') + '"><span class="k">1</span>' + pic('pick', ICON.pick) + '</div>';
-  me.inv.forEach((it, i) => {
-    const sel = me.slot === i + 1 && !me.build ? ' sel' : '', ds = '<div data-slot="' + (i + 1) + '" class="slot', k = '<span class="k">' + (i + 2) + '</span>';
-    if (!it) h += ds + sel + '">' + k + '</div>';
-    else if (it.k === 'w') h += ds + ' r' + it.r + sel + '">' + k + pic(it.w + it.r, ICON[it.w]) + '<span class="a">' + it.mag + '</span><i class="rl"></i></div>';
-    else h += ds + ' cs' + sel + '" style="--c:' + S.CONS[it.c].col + '">' + k + pic(it.c, ICON[it.c]) + '<span class="a">' + it.n + '</span></div>';
-  });
+  me.inv.forEach((it, i) => { h += slotHtml(it, i); });
+  if (invOpen) renderInvX();
   $('inv').innerHTML = h;
   const bn = { w: 'Q', f: 'F', r: 'C', c: 'V' };
   let b = '';
@@ -749,10 +745,13 @@ function renderHud() {
 }
 let lastGap = -1;
 function updateCross(spread, mode) {
-  const gap = mode === 'dot' ? 3 : Math.round(Math.min(me.ads ? 26 : 70, 3 + Math.tan(spread) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2));
-  const key = gap + mode; if (key === lastGap) return; lastGap = key;
+  // Beim Zielen deutlich kleiner: kurze Striche, kleiner Abstand
+  const ads = me.ads, L = ads ? 4 : 9, raw = 3 + Math.tan(spread) / Math.tan(camera.fov * Math.PI / 360) * innerHeight / 2;
+  const gap = mode === 'dot' ? 3 : Math.round(ads ? Math.min(7, 2 + raw * 0.35) : Math.min(70, raw));
+  const key = gap + mode + L; if (key === lastGap) return; lastGap = key;
   const c = $('cross').children; $('cross').style.display = mode === 'none' ? 'none' : 'block';
-  c[0].style.top = -(gap + 9) + 'px'; c[1].style.top = gap + 'px'; c[2].style.left = -(gap + 9) + 'px'; c[3].style.left = gap + 'px';
+  c[0].style.height = c[1].style.height = c[2].style.width = c[3].style.width = L + 'px';
+  c[0].style.top = -(gap + L) + 'px'; c[1].style.top = gap + 'px'; c[2].style.left = -(gap + L) + 'px'; c[3].style.left = gap + 'px';
   for (let i = 0; i < 4; i++) c[i].style.display = mode === 'dot' ? 'none' : 'block';
 }
 function hitMarker(cls) { const h = $('hitm'); h.className = cls || ''; h.style.opacity = 1; h.style.transform = 'rotate(45deg) scale(' + (cls === 'kill' ? 1.5 : 1) + ')'; clearTimeout(hitMarker.t); hitMarker.t = setTimeout(() => (h.style.opacity = 0), cls === 'kill' ? 320 : 120); }
@@ -1023,6 +1022,46 @@ function gotItem(i) {
   me.inv[e] = i;
   if (i.k === 'w' && me.slot === 0 && !me.build) setSlot(e + 1);
 }
+function slotHtml(it, i, big) {
+  const sel = !big && me.slot === i + 1 && !me.build ? ' sel' : '', ds = '<div data-slot="' + (i + 1) + '" class="slot', k = '<span class="k">' + (i + 2) + '</span>';
+  if (!it) return ds + sel + '">' + k + '</div>';
+  if (it.k === 'w') return ds + ' r' + it.r + sel + '">' + k + pic(it.w + it.r, ICON[it.w]) + '<span class="a">' + it.mag + '</span><i class="rl"></i></div>';
+  return ds + ' cs' + sel + '" style="--c:' + S.CONS[it.c].col + '">' + k + pic(it.c, ICON[it.c]) + '<span class="a">' + it.n + '</span></div>';
+}
+// Inventar (H): Gegenstände per Ziehen umsortieren oder wegwerfen – Maus und Touch
+var invOpen = false, ixDrag = null;
+function toggleInv(v) {
+  invOpen = v == null ? !invOpen : v; if (invOpen && (!me.alive || me.down)) invOpen = false;
+  $('invx').classList.toggle('on', invOpen);
+  if (invOpen) { mouseL = mouseR = false; me.ads = false; if (!TOUCH && document.exitPointerLock) document.exitPointerLock(); renderInvX(); SFX.ui('click'); }
+  else { ixEnd(); if (!TOUCH && phase === 'game' && me.alive) { try { cv.requestPointerLock(); } catch (e) {} } }
+}
+function renderInvX() { if (!ixDrag) $('ixs').innerHTML = me.inv.map((it, i) => slotHtml(it, i, true)).join(''); }
+function ixHit(x, y) { const g = ixDrag && ixDrag.g; if (g) g.style.display = 'none'; const el = document.elementFromPoint(x, y); if (g) g.style.display = ''; return el && el.closest ? el.closest('#ixs .slot, #ixd') : null; }
+function ixEnd() { if (ixDrag) { ixDrag.g.remove(); ixDrag.src.style.opacity = ''; document.querySelectorAll('#invx .ov').forEach((o) => o.classList.remove('ov')); ixDrag = null; } }
+$('ixs').addEventListener('pointerdown', (e) => {
+  const sl = e.target.closest('.slot'); if (!sl) return; const i = +sl.dataset.slot - 1; if (!me.inv[i]) return;
+  e.preventDefault(); const g = sl.cloneNode(true); g.classList.add('ixg'); document.body.appendChild(g); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
+  sl.style.opacity = '0.3'; ixDrag = { i, g, src: sl, pid: e.pointerId };
+});
+addEventListener('pointermove', (e) => {
+  if (!ixDrag || e.pointerId !== ixDrag.pid) return; ixDrag.g.style.left = e.clientX + 'px'; ixDrag.g.style.top = e.clientY + 'px';
+  const h = ixHit(e.clientX, e.clientY); document.querySelectorAll('#invx .ov').forEach((o) => o !== h && o.classList.remove('ov')); if (h && h !== ixDrag.src) h.classList.add('ov');
+});
+addEventListener('pointerup', (e) => {
+  if (!ixDrag || e.pointerId !== ixDrag.pid) return; const h = ixHit(e.clientX, e.clientY), a = ixDrag.i; ixEnd();
+  if (h && h.id === 'ixd') { const s0 = me.slot; me.slot = a + 1; dropItem(); me.slot = s0; }
+  else if (h && h.dataset.slot) {
+    const b = +h.dataset.slot - 1; if (b !== a) {
+      const t = me.inv[a]; me.inv[a] = me.inv[b]; me.inv[b] = t;
+      if (me.slot === a + 1) me.slot = b + 1; else if (me.slot === b + 1) me.slot = a + 1;
+      me.reload = me.using = null; SFX.equip();
+    }
+  }
+  hudDirty = true; renderInvX();
+});
+addEventListener('pointercancel', ixEnd);
+$('invx').addEventListener('click', (e) => { if (e.target.id === 'invx') toggleInv(false); });
 function dropItem() {
   if (!me.alive || me.down || me.slot === 0 || myCar) return;
   const i = me.inv[me.slot - 1]; if (!i) return;
@@ -1036,7 +1075,7 @@ function startReload() {
   me.reload = { t: W.rel, total: W.rel }; hudDirty = true; if (SHELL.has(it.w)) SFX.reload(it.w, 'shell'); else { const r0 = me.reload; if (it.w !== 'sniper' && it.w !== 'hunt') setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'in'); }, W.rel * 720); if (it.w === 'sniper' || it.w === 'hunt') setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'boltr'); }, W.rel * 250); }
 }
 function die(m) {
-  me.alive = false; me.build = null; me.deadT = 1; me.place = m.place; me.surv = gameT; mouseL = mouseR = false; leaveCar(); if (!TOUCH && document.exitPointerLock) document.exitPointerLock();
+  me.alive = false; me.build = null; me.deadT = 1; if (invOpen) toggleInv(false); me.place = m.place; me.surv = gameT; mouseL = mouseR = false; leaveCar(); if (!TOUCH && document.exitPointerLock) document.exitPointerLock();
   const items = me.inv.filter(Boolean);
   for (const a in me.ammo) if (me.ammo[a] > 0) items.push({ k: 'a', a, n: me.ammo[a] });
   for (const k in me.mats) if (me.mats[k] > 0) items.push({ k: 'm', m: k, n: me.mats[k] });
@@ -1111,6 +1150,8 @@ addEventListener('keydown', (e0) => {
   if (e.code === 'KeyP') { e0.preventDefault(); openSettings(); return; }
   if (e.code === 'KeyM') { toggleMap(); return; }
   if (e.code === 'Tab' && phase !== 'menu' && phase !== 'lobby') { e.preventDefault(); renderScore(); $('score').style.display = 'block'; return; }
+  if (e.code === 'KeyH' && phase === 'game') { e0.preventDefault(); toggleInv(); return; }
+  if (e.code === 'Escape' && invOpen) { toggleInv(false); return; }
   if (!locked) return;
   if (['Space', 'KeyF', 'ControlLeft', 'KeyQ', 'KeyC', 'KeyV', 'KeyG', 'KeyT', 'KeyR', 'KeyE', 'KeyB', 'F1', 'F3'].includes(e.code) || e.ctrlKey || e0.code === 'Space') e.preventDefault();
   if (e.repeat) return;
@@ -1198,7 +1239,7 @@ $('openSet').addEventListener('click', () => { initAudio(); openSettings(); });
 // Alle Finger laufen über einen einzigen Handler, Knöpfe werden über ihre Position erkannt (großzügige Trefferfläche)
 if (TOUCH) {
   const stick = $('stick'), knob = $('knob'), ptr = new Map();
-  const BTN = ['bFire', 'bFire2', 'bJump', 'bAds', 'bRel', 'bCrouch', 'bEmote', 'bEdit', 'bDrop'].map((id) => ({ id, el: $(id) }));
+  const BTN = ['bFire', 'bFire2', 'bJump', 'bAds', 'bRel', 'bCrouch', 'bEmote', 'bEdit', 'bDrop', 'bInv'].map((id) => ({ id, el: $(id) }));
   const SKIP = '#inv,#build,#prompt,#mini,#info,#bigmap,#score,[data-mode],input,button';
   const hitBtn = (x, y) => {
     let best = null, bd = 1e9;
@@ -1218,6 +1259,7 @@ if (TOUCH) {
     else if (id === 'bRel') startReload();
     else if (id === 'bCrouch') crouchKey();
     else if (id === 'bEdit') editWall();
+    else if (id === 'bInv') toggleInv();
     else if (id === 'bDrop') dropItem();
     else if (id === 'bEmote') { if (me.st === 'ground' && !myCar && !me.down) me.emote = me.emote > 0 ? 0 : 6; }
   };
@@ -1459,7 +1501,7 @@ function fire(it, now) {
   for (let i = 0; i < W.pellets; i++) {
     const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * sp;
     const d = dir.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(u2, Math.sin(a) * r).normalize();
-    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 300 : 230; bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
+    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 1000 : 800; bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
     const h = raycast(o.x, o.y, o.z, d.x, d.y, d.z, 500);
     if (!end) end = [h.x, h.y, h.z];
     tally(h, agg);
@@ -1661,7 +1703,8 @@ function updateMe(dt, now) {
     if (k >= 1) { me.mantle = null; me.onGround = true; me.vy = 0; }
     return;
   }
-  me.sprint = !!(wx || wz) && fw > 0.3 && !me.ads && !me.crouch && !me.using && !me.down && !me.swim && (joy.id !== null ? joyM > 0.62 : CFG.autoSprint ? !keys.ShiftLeft : !!keys.ShiftLeft);
+  const airSpr = !me.onGround && me.airSprint && !!(wx || wz);
+  me.sprint = airSpr || !!(wx || wz) && fw > 0.3 && !me.ads && !me.crouch && !me.using && !me.down && !me.swim && (joy.id !== null ? joyM > 0.62 : CFG.autoSprint ? !keys.ShiftLeft : !!keys.ShiftLeft);
   let sp = me.down ? 1.7 : me.swim ? (me.sprint ? 4.6 : 3.4) : me.crouch ? 3 : me.sprint ? 7.6 : 5.6;
   if (me.ads) sp *= 0.6; if (me.using) sp *= 0.5;
   if (!me.swim && S.height(me.x, me.z) < -0.6) sp *= 0.6;
@@ -1678,7 +1721,7 @@ function updateMe(dt, now) {
   for (let s = 0; s < steps; s++) {
     const nx = me.x + (vx + me.kx) * h; if (!blocked(nx, me.z, me.y, me.x, me.z)) me.x = nx; else { me.kx = 0; if ((keys.Space || !me.onGround || me.swim) && tryMantle(wx, wz)) return; }
     const nz = me.z + (vz + me.kz) * h; if (!blocked(me.x, nz, me.y, me.x, me.z)) me.z = nz; else { me.kz = 0; if ((keys.Space || !me.onGround || me.swim) && tryMantle(wx, wz)) return; }
-    if (keys.Space && me.onGround && !me.down) { SFX.jump(); me.vy = me.swim ? 5.5 : 7.6; me.onGround = false; me.emote = 0; me.slide = 0; if (me.swim) fx.burst(me.x, me.y + 0.9, me.z, '#dff2ff', 6, 2, 0.12, 0.4, 6); }
+    if (keys.Space && me.onGround && !me.down) { me.airSprint = me.sprint; SFX.jump(); me.vy = me.swim ? 5.5 : 7.6; me.onGround = false; me.emote = 0; me.slide = 0; if (me.swim) fx.burst(me.x, me.y + 0.9, me.z, '#dff2ff', 6, 2, 0.12, 0.4, 6); }
     me.vy -= 22 * h;
     let ny = me.y + me.vy * h;
     if (me.vy > 0 && ceiling(me.x, me.z, me.y, ny)) { me.vy = 0; ny = me.y; }

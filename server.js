@@ -594,6 +594,9 @@ function newWaypoint(b, force) {
 }
 function los(a, e, d) {
   const dx = e.x - a.x, dy = e.y + 1.2 - (a.y + 1.5), dz = e.z - a.z, l = Math.hypot(dx, dy, dz) || 1;
+  // Gelände (Berge/Hügel) blockiert die Sicht – Bots schießen nicht mehr durch Berge
+  const n = Math.ceil(l / 2.5);
+  for (let i = 1; i < n; i++) { const f = i / n, y = a.y + 1.5 + dy * f; if (y < S.height(a.x + dx * f, a.z + dz * f) - 0.2) return false; }
   return !world.pg.ray(a.x, a.y + 1.5, a.z, dx / l, dy / l, dz / l, l);
 }
 function blockedObj(x, z, y) {
