@@ -1596,7 +1596,7 @@ function actions(dt, now) {
     if (now - me.lastShot >= S.W[it.w].rate && me.ch.draw > 0.8) fire(it, now);
   } else if (gren) {
     if (now - me.lastThrow < 900) return;
-    me.lastThrow = now; const t = throwVec(); spawnNade(t.o, t.v, true, it.c); tx({ t: 'nade', k: it.c, o: t.o, v: t.v }); me.ch.sinceShot = 0; SFX.swing();
+    me.lastThrow = now; const t = throwVec(); spawnNade(t.o, t.v, true, it.c); tx({ t: 'nade', k: it.c, o: t.o, v: t.v }); me.ch.sinceShot = 0; SFX.nadeThrow();
     it.n--; if (it.n <= 0) me.inv[me.slot - 1] = null; hudDirty = true;
   } else if (it && it.k === 'c' && !me.using && !(me.useLock && mouseL)) {
     const full = it.c === 'med' ? me.hp >= 100 : it.c === 'band' ? me.hp >= 75 : it.c === 'pot' ? me.sh >= 100 : it.c === 'chug' ? me.hp >= 100 && me.sh >= 100 : it.c === 'bush' ? me.bush : me.sh >= 50;

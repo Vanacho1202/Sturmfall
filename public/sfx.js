@@ -72,7 +72,7 @@ const GUN = {
   hunt:   [0.26, 3000, 0.95, 105, 34, 0.3, 1700, 1.0],
 };
 // ---------------- Echte Aufnahmen (public/snd)
-const SMP = {}, SFILES = ['ar', 'ar2', 'ar3', 'smg', 'smg2', 'smg3', 'pistol', 'pistol2', 'pistol3', 'shotgun', 'pump', 'sniper', 'bolt', 'boom_b2', 'boom_b3', 'boom_b4', 'boom_low', 'boom_heavy', 'boom_distant'];
+const SMP = {}, SFILES = ['ar', 'ar2', 'ar3', 'smg', 'smg2', 'smg3', 'pistol', 'pistol2', 'pistol3', 'shotgun', 'pump', 'sniper', 'bolt', 'boom_b2', 'boom_b3', 'boom_b4', 'boom_low', 'boom_heavy', 'boom_distant', 'nade'];
 function loadSamples() {
   for (const k of SFILES) fetch('/snd/' + k + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => b && new Promise((res, rej) => C.decodeAudioData(b, res, rej))).then((buf) => { if (buf) SMP[k] = buf; }).catch(() => {});
 }
@@ -193,6 +193,7 @@ export function pieceBreak(mat, p) {
   os(o, t, 0.3, m[0] * 0.6, m[0] * 0.3, { vol: 0.3 });
 }
 export function edit() { if (!C) return; const t = C.currentTime, o = out(null, { bus: 'u' }); os(o, t, 0.05, 1200, 900, { vol: 0.1, type: 'square' }); nz(o, t, 0.05, 2000, { type: 'bandpass', q: 3, vol: 0.2 }); }
+export function nadeThrow() { if (C && SMP.nade) { sample('nade', null, 0.8, 0.97 + Math.random() * 0.06); return; } swing(); }
 export function swing() { if (!C) return; const t = C.currentTime, o = out(null); nz(o, t, 0.16, 500, { f2: 2000, type: 'bandpass', q: 1, vol: 0.18, a: 0.04 }); }
 export function chop(kind, p) {
   if (!ok(p, 50)) return; const t = C.currentTime, o = out(p, { ref: 3 });
@@ -241,7 +242,12 @@ export function car(kind, p) {
   else if (kind === 'door') { nz(o, t, 0.08, 900, { type: 'bandpass', q: 2, vol: 0.4 }); os(o, t, 0.1, 140, 90, { vol: 0.25 }); }
 }
 export function nadeBounce(p) { if (!ok(p, 40)) return; const t = C.currentTime, o = out(p); os(o, t, 0.05, 900, 600, { vol: 0.15, type: 'triangle' }); }
-export function gas(p) { if (!ok(p, 80)) return; const t = C.currentTime, o = out(p, { ref: 5 }); nz(o, t, 1.5, 300, { f2: 1200, vol: 0.5, pink: true, a: 0.1 }); }
+export function gas(p) {
+  if (!ok(p, 80)) return; const t = C.currentTime, o = out(p, { ref: 5 });
+  os(o, t, 0.12, 180, 60, { vol: 0.35, type: 'triangle' }); nz(o, t, 0.25, 2500, { f2: 600, vol: 0.35, a: 0.005 });
+  nz(o, t + 0.05, 3.2, 700, { f2: 1600, vol: 0.45, pink: true, a: 0.25 });
+  for (let i = 0; i < 9; i++) { const tt = t + 0.3 + i * 0.32 + Math.random() * 0.15; os(o, tt, 0.07, 140 + Math.random() * 120, 90, { vol: 0.12, type: 'sine' }); }
+}
 export function rebootBeep(p) { if (!ok(p, 40)) return; const t = C.currentTime, o = out(p); os(o, t, 0.12, 1200, 1200, { vol: 0.08, type: 'square' }); }
 
 // ---------------- Dauerschleifen (Wind, Sturm, Motor, Truhe, Umgebung)
