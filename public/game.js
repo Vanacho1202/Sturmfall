@@ -886,7 +886,7 @@ function onMsg(m) {
       show('lobby', true); show('dead', false); show('win', false); show('hud', false); stormMesh.visible = shipMesh.visible = false; $('tint').style.opacity = 0; $('score').style.display = 'none';
       break;
     case 'start':
-      matchMode = m.mode || 'solo'; shipLine = m.ship; lastSpec = -1; dropEnts(); setRoster(m.roster); leaveCar(); buildWorld(m.world); resetMe(); phase = 'game'; gameT = 0; shipS = [m.ship.ax, m.ship.az]; me.x = m.ship.ax; me.z = m.ship.az; me.y = S.SHIPY - 8; $('feed').innerHTML = ''; $('picks').innerHTML = '';
+      matchMode = m.mode || 'solo'; shipLine = m.ship; lastSpec = -1; dropEnts(); setRoster(m.roster); leaveCar(); buildWorld(m.world); resetMe(); if (CFG.kit) giveKit(); phase = 'game'; gameT = 0; shipS = [m.ship.ax, m.ship.az]; me.x = m.ship.ax; me.z = m.ship.az; me.y = S.SHIPY - 8; $('feed').innerHTML = ''; $('picks').innerHTML = '';
       show('lobby', false); show('dead', false); show('win', false); show('hud', true); PV.ch.g.visible = false;
       me.ch = makeChar(myId);
       banner(matchMode === 'duo' && mateId ? 'DUO · Teammate: ' + nameOf(mateId) : TOUCH ? 'SPRUNG-Taste: Abspringen!' : 'Leertaste: Abspringen!', 5);
@@ -1066,6 +1066,12 @@ addEventListener('pointerup', (e) => {
 });
 addEventListener('pointercancel', ixEnd);
 $('invx').addEventListener('click', (e) => { if (e.target.id === 'invx') toggleInv(false); });
+// Test-Ausrüstung (Einstellungen → Spiel): legendäres Sturmgewehr, Jagdgewehr, Sniper, 2 Medkits, volle Munition
+function giveKit() {
+  const L = 4, w = (k) => ({ k: 'w', w: k, r: L, mag: S.W[k].mag });
+  me.inv = [w('ar'), w('hunt'), w('sniper'), { k: 'c', c: 'med', n: 2 }, null];
+  me.ammo = { ...me.ammo, light: 300, medium: 600, shells: 60, heavy: 60 }; me.mats = { wood: 500, stone: 500, metal: 500 }; hudDirty = true;
+}
 function dropItem() {
   if (!me.alive || me.down || me.slot === 0 || myCar) return;
   const i = me.inv[me.slot - 1]; if (!i) return;
