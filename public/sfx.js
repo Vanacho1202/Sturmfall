@@ -72,7 +72,7 @@ const GUN = {
   hunt:   [0.26, 3000, 0.95, 105, 34, 0.3, 1700, 1.0],
 };
 // ---------------- Echte Aufnahmen (public/snd)
-const SMP = {}, SFILES = ['ar', 'ar2', 'ar3', 'smg', 'smg2', 'smg3', 'pistol', 'pistol2', 'pistol3', 'shotgun', 'pump', 'sniper', 'bolt'];
+const SMP = {}, SFILES = ['ar', 'ar2', 'ar3', 'smg', 'smg2', 'smg3', 'pistol', 'pistol2', 'pistol3', 'shotgun', 'pump', 'sniper', 'bolt', 'boom_b2', 'boom_b3', 'boom_b4', 'boom_low', 'boom_heavy', 'boom_distant'];
 function loadSamples() {
   for (const k of SFILES) fetch('/snd/' + k + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => b && new Promise((res, rej) => C.decodeAudioData(b, res, rej))).then((buf) => { if (buf) SMP[k] = buf; }).catch(() => {});
 }
@@ -99,10 +99,17 @@ export function gun(w, p) {
 }
 export function rocketLaunch(p) {
   if (!ok(p, 500)) return; const t = C.currentTime, o = out(p, { ref: 6, roll: 0.8, air: 160 });
+  if (SMP.boom_heavy) sample('boom_heavy', p, 1, 0.8, { ref: 6, roll: 0.8, air: 160 });
   nz(o, t, 0.9, 600, { vol: 0.7, f2: 3500, type: 'bandpass', q: 0.6, a: 0.03 }); os(o, t, 0.4, 90, 40, { vol: 0.5 }); nz(o, t, 0.15, 3000, { vol: 0.4 });
 }
 export function boom(p, big) {
-  if (!ok(p, 900)) return; const t = C.currentTime, o = out(p, { ref: 10, roll: 0.6, air: 220, rev: 0.3, revD: 250 }), k = big ? 1.3 : 1;
+  if (!ok(p, 900)) return;
+  if (SMP.boom_b3) { // echte Aufnahmen (CC0): nah krachend, fern dumpf
+    const d = dist(p), o = { ref: 10, roll: 0.6, air: 260, rev: 0.3, revD: 250 };
+    if (d < 140) { sample(['boom_b2', 'boom_b3', 'boom_b4'][rr++ % 3], p, big ? 1.2 : 1, big ? 0.85 : 1, o); sample('boom_low', p, 0.9, 1, o); }
+    else sample('boom_distant', p, 1.3, 1, o);
+    return;
+  } const t = C.currentTime, o = out(p, { ref: 10, roll: 0.6, air: 220, rev: 0.3, revD: 250 }), k = big ? 1.3 : 1;
   os(o, t, 1.1 * k, 80, 22, { vol: 0.9 }); nz(o, t, 1.4 * k, 1800, { vol: 0.9, f2: 120, pink: true }); nz(o, t, 0.06, 6000, { vol: 0.5, type: 'highpass' });
   for (let i = 0; i < 5; i++) nz(o, t + 0.15 + Math.random() * 0.5, 0.25, 2500 + Math.random() * 2000, { vol: 0.08, type: 'bandpass', q: 2 });
 }

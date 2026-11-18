@@ -56,3 +56,8 @@ APK nach `public/Sturmfall.apk` kopieren und pushen.
 
 Aus Gabriels Aufnahmen geschnitten (Downloads, 18.11.2026): SCAR → Sturmgewehr, MP5 → MP, Glock 17 → Pistole,
 Shotgun → Schrotflinten (+ Pumpen), Barrett .50 → Scharfschütze/Jagdgewehr (+ Nachladen).
+
+## Fremde Inhalte (CC0, frei nutzbar)
+
+- 3D-Modelle: Kenney (kenney.nl) – City Kits, Car Kit, Furniture, Nature, Pirate, Survival
+- Explosionen: „150 Combat Sound Effects“ (untamedpixels) und „Muffled Distant Explosion“ (NenadSimic), opengameart.org
