@@ -1505,7 +1505,7 @@ function fire(it, now) {
   for (let i = 0; i < W.pellets; i++) {
     const a = Math.random() * 6.283, r = Math.sqrt(Math.random()) * sp;
     const d = dir.clone().addScaledVector(right, Math.cos(a) * r).addScaledVector(u2, Math.sin(a) * r).normalize();
-    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 2600 : 2300; /* praktisch sofort am Ziel */ bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 2.2, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
+    if (SNIP.has(it.w)) { const bs = it.w === 'sniper' ? 26000 : 23000; /* praktisch sofort am Ziel */ bullets.push({ x: o.x, y: o.y, z: o.z, vx: d.x * bs, vy: d.y * bs, vz: d.z * bs, t: 0.05, w: it.w, r: it.r, first: mz }); end = [o.x + d.x * 220, o.y + d.y * 220, o.z + d.z * 220]; continue; }
     const h = raycast(o.x, o.y, o.z, d.x, d.y, d.z, 500);
     if (!end) end = [h.x, h.y, h.z];
     tally(h, agg);
