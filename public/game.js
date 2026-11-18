@@ -1038,11 +1038,13 @@ function toggleInv(v) {
 }
 function renderInvX() { if (!ixDrag) $('ixs').innerHTML = me.inv.map((it, i) => slotHtml(it, i, true)).join(''); }
 function ixHit(x, y) { const g = ixDrag && ixDrag.g; if (g) g.style.display = 'none'; const el = document.elementFromPoint(x, y); if (g) g.style.display = ''; return el && el.closest ? el.closest('#ixs .slot, #ixd') : null; }
-function ixEnd() { if (ixDrag) { ixDrag.g.remove(); ixDrag.src.style.opacity = ''; document.querySelectorAll('#invx .ov').forEach((o) => o.classList.remove('ov')); ixDrag = null; } }
+function ixEnd() { if (ixDrag) { ixDrag.g.remove(); if (ixDrag.ic) ixDrag.ic.style.visibility = ''; document.querySelectorAll('#invx .ov').forEach((o) => o.classList.remove('ov')); ixDrag = null; } }
 $('ixs').addEventListener('pointerdown', (e) => {
   const sl = e.target.closest('.slot'); if (!sl) return; const i = +sl.dataset.slot - 1; if (!me.inv[i]) return;
-  e.preventDefault(); const g = sl.cloneNode(true); g.classList.add('ixg'); document.body.appendChild(g); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
-  sl.style.opacity = '0.3'; ixDrag = { i, g, src: sl, pid: e.pointerId };
+  // Nur das Item-Bild wandert mit, der Slot bleibt stehen
+  e.preventDefault(); const ic = sl.querySelector('img') || sl.querySelector(':scope > :not(.k):not(.a):not(.rl)'), g = document.createElement('div'); g.className = 'ixg';
+  if (ic) g.appendChild(ic.cloneNode(true)); document.body.appendChild(g); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px';
+  if (ic) ic.style.visibility = 'hidden'; ixDrag = { i, g, src: sl, ic, pid: e.pointerId };
 });
 addEventListener('pointermove', (e) => {
   if (!ixDrag || e.pointerId !== ixDrag.pid) return; ixDrag.g.style.left = e.clientX + 'px'; ixDrag.g.style.top = e.clientY + 'px';
@@ -1141,7 +1143,7 @@ cv.addEventListener('mousedown', (e) => {
 });
 addEventListener('mouseup', (e) => { if (TOUCH) return; if (e.button === 0) mouseL = false; if (e.button === 2) mouseR = false; });
 addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('wheel', (e) => { if (!locked || !me.alive) return; setSlot((me.slot + (e.deltaY > 0 ? 1 : 5)) % 6); });
+addEventListener('wheel', (e) => { if (e.ctrlKey && phase !== 'menu') e.preventDefault(); if (!locked || !me.alive) return; setSlot((me.slot + (e.deltaY > 0 ? 1 : 5)) % 6); }, { passive: false });
 addEventListener('keydown', (e0) => {
   if (document.activeElement === $('name')) { if (e0.code === 'Enter') $('play').click(); return; }
   if (setOpen()) return;
