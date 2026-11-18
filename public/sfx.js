@@ -19,7 +19,7 @@ export function init() {
   const rl = C.sampleRate * 2.4, ir = C.createBuffer(2, rl, C.sampleRate);
   for (let c = 0; c < 2; c++) { const a = ir.getChannelData(c); for (let i = 0; i < rl; i++) a[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / rl, 3.2); }
   const conv = C.createConvolver(); conv.buffer = ir; revIn = C.createGain(); revIn.gain.value = 0.5; revIn.connect(conv); conv.connect(buses.s);
-  setVol(VOL);
+  setVol(VOL); loadSamples();
 }
 export function setVol(v) {
   Object.assign(VOL, v); if (!C) return;
@@ -71,7 +71,20 @@ const GUN = {
   sniper: [0.3, 3400, 1.0, 95, 30, 0.36, 1500, 1.2],
   hunt:   [0.26, 3000, 0.95, 105, 34, 0.3, 1700, 1.0],
 };
+// ---------------- Echte Aufnahmen (public/snd)
+const SMP = {}, SFILES = ['ar', 'smg', 'pistol', 'shotgun', 'pump', 'sniper', 'bolt'];
+function loadSamples() {
+  for (const k of SFILES) fetch('/snd/' + k + '.mp3').then((r) => (r.ok ? r.arrayBuffer() : null)).then((b) => b && new Promise((res, rej) => C.decodeAudioData(b, res, rej))).then((buf) => { if (buf) SMP[k] = buf; }).catch(() => {});
+}
+// Waffe -> Aufnahme, Lautstärke, Tonhöhe
+const GMAP = { ar: ['ar', 0.8, 1], smg: ['smg', 0.6, 1], pistol: ['pistol', 0.75, 1], shotgun: ['shotgun', 1, 1], tac: ['shotgun', 0.9, 1.12], sniper: ['sniper', 1, 1], hunt: ['sniper', 0.85, 1.12] };
+function sample(k, p, vol, rate, o) {
+  const buf = SMP[k]; if (!buf) return false;
+  const src = C.createBufferSource(), g = C.createGain(); src.buffer = buf; src.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
+  g.gain.value = vol; src.connect(g); g.connect(out(p, o)); src.start(); return true;
+}
 export function gun(w, p) {
+  if (C && GMAP[w] && SMP[GMAP[w][0]] && (!p || dist(p) < 700)) { const m = GMAP[w], far = p && dist(p) > 150; sample(m[0], p, m[1] * (far ? 1.3 : 1), m[2] * (far ? 0.94 : 1), { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.06, revD: 220 }); return; }
   if (!ok(p, 600)) return; const g = GUN[w]; if (!g) return rocketLaunch(p);
   const t = C.currentTime, d = dist(p), o = out(p, { ref: 6, roll: 0.75, air: 140, rev: p ? 0.15 : 0.12, revD: 220 }), far = d > 120;
   nz(o, t, g[0] * (far ? 1.6 : 1), far ? 1400 : g[1], { vol: g[2], f2: 300, q: 0.5 });
@@ -96,6 +109,8 @@ export function reload(w, phase, p) {
   if (phase === 'out') { nz(o, t, 0.05, 2600, { type: 'bandpass', q: 3, vol: 0.35 }); os(o, t + 0.01, 0.05, 900, 600, { vol: 0.12, type: 'square' }); }
   else if (phase === 'in') { nz(o, t, 0.06, 1800, { type: 'bandpass', q: 3, vol: 0.4 }); os(o, t + 0.04, 0.04, 1400, 1100, { vol: 0.18, type: 'square' }); }
   else if (phase === 'shell') { nz(o, t, 0.04, 2200, { type: 'bandpass', q: 4, vol: 0.3 }); os(o, t, 0.05, 700, 500, { vol: 0.1, type: 'triangle' }); }
+  else if (phase === 'boltr') { if (!sample('bolt', p, 0.85, 1.1, { ref: 2 })) reload(w, 'in', p); }
+  else if (phase === 'pump' && SMP.pump) sample('pump', p, 0.8, 1.05, { ref: 2 });
   else if (phase === 'bolt') { nz(o, t, 0.05, 3200, { type: 'bandpass', q: 3, vol: 0.3 }); nz(o, t + 0.16, 0.06, 2400, { type: 'bandpass', q: 3, vol: 0.35 }); }
   else if (phase === 'pump') { nz(o, t, 0.07, 1300, { type: 'bandpass', q: 2, vol: 0.45 }); nz(o, t + 0.15, 0.07, 1700, { type: 'bandpass', q: 2, vol: 0.45 }); }
 }

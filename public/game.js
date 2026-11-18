@@ -996,7 +996,7 @@ function setSlot(n) { if (myCar) return; if (n !== me.slot) SFX.equip(); me.slot
 function startReload() {
   const it = curItem(); if (!it || it.k !== 'w' || me.reload || myCar) return;
   const W = S.W[it.w]; if (it.mag >= W.mag || me.ammo[W.ammo] <= 0) return;
-  me.reload = { t: W.rel, total: W.rel }; hudDirty = true; if (SHELL.has(it.w)) SFX.reload(it.w, 'shell'); else { const r0 = me.reload; setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'in'); }, W.rel * 720); if (it.w === 'sniper' || it.w === 'hunt') setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'bolt'); }, W.rel * 880); }
+  me.reload = { t: W.rel, total: W.rel }; hudDirty = true; if (SHELL.has(it.w)) SFX.reload(it.w, 'shell'); else { const r0 = me.reload; if (it.w !== 'sniper' && it.w !== 'hunt') setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'in'); }, W.rel * 720); if (it.w === 'sniper' || it.w === 'hunt') setTimeout(() => { if (me.reload === r0) SFX.reload(it.w, 'boltr'); }, W.rel * 250); }
 }
 function die(m) {
   me.alive = false; me.build = null; me.deadT = 1; me.place = m.place; me.surv = gameT; mouseL = mouseR = false; leaveCar(); if (!TOUCH && document.exitPointerLock) document.exitPointerLock();
