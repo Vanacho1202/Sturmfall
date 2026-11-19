@@ -2,7 +2,7 @@
 const TOUCH0 = matchMedia('(pointer: coarse)').matches || /[?&]touch=1/.test(location.search);
 const DEF = {
   v: 3, fullscreen: true, auto: TOUCH0, sens: 1, ads: 0.6, scope: 0.22, invY: false, fov: 72, shake: true, bob: true, dmgNum: true, crouchToggle: true, autoSprint: false,
-  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, pad: {}, kit: false, padSens: 1, hudScale: 1, hudAlpha: 0.85, shad: true,
+  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, pad: {}, kit: false, aimAssist: true, padSens: 1, hudScale: 1, hudAlpha: 0.85, shad: true,
 };
 export const ACTIONS = [
   ['KeyW', 'Vorwärts'], ['KeyS', 'Rückwärts'], ['KeyA', 'Links'], ['KeyD', 'Rechts'], ['Space', 'Springen / Gleiter'], ['ControlLeft', 'Ducken / Rutschen'], ['ShiftLeft', 'Sprinten (halten)'],
@@ -81,6 +81,7 @@ const rg = (k, min, max, step, fmt, sub) => `<input type="range" data-rg="${k}" 
 
 const TABS = {
   spiel: () =>
+    row('Zielhilfe', 'Am Handy/iPad und mit Controller: Zielen zieht leicht zum Gegner', tg('aimAssist')) +
     row('Test-Ausrüstung', 'Jede Runde mit legendärem Sturmgewehr, Jagdgewehr, Sniper, 2 Medkits und voller Munition', tg('kit')) +
     row('Auto-Feuer', 'Schießt automatisch, wenn das Fadenkreuz auf einem Gegner liegt', tg('auto')) +
     row('Auto-Sprint', 'An: immer rennen, Sprint-Taste = gehen. Aus: Sprint-Taste halten', tg('autoSprint')) +

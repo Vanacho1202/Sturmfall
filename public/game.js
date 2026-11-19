@@ -863,10 +863,12 @@ function setRoster(r) {
   for (const e of ents.values()) e.mate = e.id === mateId;
 }
 function dropEnts() { for (const e of ents.values()) { scene.remove(e.ch.g); disposeChar(e.ch); } ents.clear(); if (me.ch) { scene.remove(me.ch.g); disposeChar(me.ch); me.ch = null; } }
+let roomM = TOUCH, roomPk = null, myName = '';
 function connect(name) {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (TOUCH ? '/?room=m' : '/'));
-  ws.onopen = () => tx({ t: 'join', name, hue: HUES[PV.hi], style: PV.st | (PV.skin << 2), mode: prefMode });
-  ws.onclose = () => { banner('Verbindung getrennt – Seite neu laden', 999); };
+  myName = name;
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (roomM ? '/?room=m' : '/'));
+  ws.onopen = () => { tx({ t: 'join', name, hue: HUES[PV.hi], style: PV.st | (PV.skin << 2), mode: roomPk ? 'duo' : prefMode, pk: roomPk }); roomPk = null; };
+  ws.onclose = () => { if (ws && ws.switching) return; banner('Verbindung getrennt – Seite neu laden', 999); };
   ws.onmessage = (ev) => onMsg(JSON.parse(ev.data));
 }
 function leaveCar() { myCar = 0; engineSound(false); $('speed').style.display = 'none'; document.body.classList.remove('driving'); }
@@ -944,8 +946,12 @@ function onMsg(m) {
     }
     case 'roster': setRoster(m.r); break;
     case 'inv': showInvite(m); break;
+    case 'goroom': { // gemischtes Duo (PC + Handy/iPad): ab in die Handy-Runde
+      banner('Wechsle in die Handy-Runde zu deinem Duo-Partner …', 3); roomM = true; roomPk = m.pk; prefMode = 'duo';
+      const old = ws; old.switching = true; try { old.close(); } catch (e) {} connect(myName); break;
+    }
     case 'invno': banner(m.name + ' hat abgelehnt', 2); break;
-    case 'party': party = m.id; partyName = m.name || ''; lobbyList.k = null; if (m.id) { banner('Duo mit ' + m.name + '!', 2.5); SFX.ui('good'); prefMode = 'duo'; setModeUI(); } else if (m.left) banner(m.left + ' hat das Team verlassen', 2); break;
+    case 'party': if (m.wait) banner('Duo angenommen – Partner kommt in deine Runde …', 3); party = m.id; partyName = m.name || ''; lobbyList.k = null; if (m.id) { banner('Duo mit ' + m.name + '!', 2.5); SFX.ui('good'); prefMode = 'duo'; setModeUI(); } else if (m.left) banner(m.left + ' hat das Team verlassen', 2); break;
     case 'knock': {
       const v = esc(nameOf(m.v));
       if (m.k === myId) { $('elim').innerHTML = '⬇ NIEDERGESCHLAGEN &nbsp;<b>' + v + '</b>'; $('elim').style.opacity = 1; elimT = 2.2; hitMarker('kill'); SFX.elim(true); }
@@ -1706,7 +1712,25 @@ function pollPad(dt) {
     me.yaw -= rx * Math.abs(rx) * k; me.pitch = clamp(me.pitch - ry * Math.abs(ry) * k * 0.75 * (CFG.invY ? -1 : 1), -1.5, 1.5);
   }
 }
+// Zielhilfe für Touch (Handy/iPad) und Controller: zieht beim Zielen/Schießen sanft zum nächsten Gegner nahe am Fadenkreuz
+function aimAssist(dt) {
+  if (!(TOUCH || pad.on) || CFG.aimAssist === false || !me.alive || myCar || me.build || !(me.ads || mouseL)) return;
+  const it = me.inv[me.slot - 1]; if (!it || it.k !== 'w') return;
+  const ex = me.x, ey = me.y + 1.6, ez = me.z, fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
+  let best = null, ba = me.ads ? 0.16 : 0.1;
+  for (const e of ents.values()) {
+    if (!e.alive || e.mate || (e.fl & 1) || T - e.lastSeen > 0.5) continue;
+    const dx = e.x - ex, dz = e.z - ez, dy = e.y + 1.2 - ey, dh = Math.hypot(dx, dz); if (dh > 120 || dh < 1) continue;
+    const yawT = Math.atan2(-dx, -dz), pitT = Math.atan2(dy, dh);
+    let dyaw = yawT - me.yaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+    const ang = Math.hypot(dyaw, pitT - me.pitch); if (ang < ba) { ba = ang; best = [dyaw, pitT - me.pitch]; }
+  }
+  if (!best) return;
+  const k = Math.min(1, dt * (me.ads ? 7 : 4));
+  me.yaw += best[0] * k; me.pitch += best[1] * k;
+}
 function updateMe(dt, now) {
+  aimAssist(dt);
   rec.p += (rec.tp - rec.p) * Math.min(1, dt * 28); rec.y += (rec.ty - rec.y) * Math.min(1, dt * 28);
   const dk = Math.exp(-dt * 5.5); rec.tp *= dk; rec.ty *= dk;
   me.bloom = Math.max(0, me.bloom - dt * (performance.now() - me.lastShot > 200 ? 0.14 : 0.03));

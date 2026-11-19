@@ -45,8 +45,22 @@ const server = http.createServer((req, res) => {
 });
 // Handy/iPad bekommen eine eigene Runde mit 100 Spielern: zweiter Spielprozess, WebSocket wird durchgereicht
 const CHILD = !!process.env.CHILD, MPORT = +PORT + 7;
+// Raum-übergreifende Lobby: PC-Runde und Handy-Runde sehen sich gegenseitig und können Duo spielen (gemischt → Handy-Runde)
+let peer = null, remotePl = [], remoteT = 0;
+const ipc = (m) => { try { if (CHILD) process.send && process.send(m); else if (peer && peer.connected) peer.send(m); } catch (e) {} };
+function onIpc(m) {
+  if (!m || !m.k) return;
+  if (m.k === 'pl') { remotePl = m.pl; remoteT = Date.now(); return; }
+  const c = clients.get(m.to | 0); if (!c) return;
+  if (m.k === 'inv') { if (c.joined && !c.inMatch) send(c, { t: 'inv', from: -m.from, name: m.name }); }
+  else if (m.k === 'invno') send(c, { t: 'invno', name: m.name });
+  else if (m.k === 'pk') { c.pk = m.key; send(c, { t: 'party', id: 0, wait: m.name }); }
+  else if (m.k === 'move') send(c, { t: 'goroom', pk: m.key });
+}
+if (CHILD) process.on('message', onIpc);
+const newKey = () => Math.random().toString(36).slice(2, 10);
 if (!CHILD && !process.env.NOMOBILE) {
-  const start = () => { const ch = require('child_process').fork(__filename, [], { env: { ...process.env, CHILD: '1', PORT: String(MPORT), TOTAL: '100' } }); ch.on('exit', () => setTimeout(start, 2000)); };
+  const start = () => { const ch = require('child_process').fork(__filename, [], { env: { ...process.env, CHILD: '1', PORT: String(MPORT), TOTAL: '100' } }); peer = ch; ch.on('message', onIpc); ch.on('exit', () => { peer = null; remotePl = []; setTimeout(start, 2000); }); };
   start();
   server.on('upgrade', (req, sock, head) => {
     if (!/[?&]room=m\b/.test(req.url)) { wss.handleUpgrade(req, sock, head, (ws) => wss.emit('connection', ws, req)); return; }
@@ -882,7 +896,8 @@ setInterval(() => {
       mode = lobbyMode(hs);
       if (hs.length) { lobbyT -= dt; if (lobbyT <= 0) startMatch(); }
       else lobbyT = LOBBY;
-      if (phase === 'lobby' && tickN % 4 === 0) { const d = hs.filter((c) => c.mode === 'duo').length; broadcast({ t: 's', ph: 'lobby', tm: Math.ceil(lobbyT), names: hs.map((c) => c.name), pl: hs.map((c) => [c.id, c.name, c.party || 0]), mode, v: [hs.length - d, d] }); }
+      if (tickN % 8 === 0) ipc({ k: 'pl', pl: hs.filter((c) => c.joined && !c.inMatch && !c.party).map((c) => [c.id, c.name]) });
+      if (phase === 'lobby' && tickN % 4 === 0) { const d = hs.filter((c) => c.mode === 'duo').length; broadcast({ t: 's', ph: 'lobby', tm: Math.ceil(lobbyT), names: hs.map((c) => c.name), pl: hs.map((c) => [c.id, c.name, c.party || 0]).concat(Date.now() - remoteT < 3000 ? remotePl.map((x) => [-x[0], x[1] + (CHILD ? ' 💻' : ' 📱'), 0]) : []), mode, v: [hs.length - d, d] }); }
       return;
     }
     if (!hs.length || !hs.some((c) => c.inMatch)) { toLobby(); return; }
@@ -931,11 +946,23 @@ function onMsg(c, m) {
     // Läuft nur noch eine Runde mit Bots (kein Mensch mehr drin)? Dann gleich neue Runde statt Zuschauen.
     if (phase !== 'lobby' && ![...clients.values()].some((o) => o !== c && o.joined && o.inMatch && o.alive)) toLobby();
     send(c, { t: 'init', id: c.id, phase, mode: phase !== 'lobby' ? matchMode : mode, world: phase !== 'lobby' ? packWorld() : null, ship, roster: phase !== 'lobby' ? roster() : [] });
+    if (m.pk) { // Duo aus der anderen Runde: Partner mit gleichem Schlüssel suchen
+      const o = [...clients.values()].find((x) => x !== c && x.pk === String(m.pk));
+      if (o) { o.pk = c.pk = null; c.party = o.id; o.party = c.id; c.mode = o.mode = 'duo'; send(c, { t: 'party', id: o.id, name: o.name }); send(o, { t: 'party', id: c.id, name: c.name }); }
+    }
     return;
   }
   if (!c.joined) return;
   if (m.t === 'mode') { c.mode = m.m === 'duo' ? 'duo' : 'solo'; return; }
   if (m.t === 'spec') { c.spec = m.id | 0; return; }
+  if (m.t === 'inv' && (m.id | 0) < 0) { ipc({ k: 'inv', to: -(m.id | 0), from: c.id, name: c.name }); return; }
+  if (m.t === 'invno' && (m.id | 0) < 0) { ipc({ k: 'invno', to: -(m.id | 0), name: c.name }); return; }
+  if (m.t === 'invok' && (m.id | 0) < 0) {
+    const key = newKey(), other = -(m.id | 0);
+    if (CHILD) { c.pk = key; c.mode = 'duo'; ipc({ k: 'move', to: other, key }); send(c, { t: 'party', id: 0, wait: '…' }); } // PC-Spieler kommt rüber
+    else { ipc({ k: 'pk', to: other, key, name: c.name }); send(c, { t: 'goroom', pk: key }); } // ich (PC) wechsle in die Handy-Runde
+    return;
+  }
   if (m.t === 'inv') { const o = clients.get(m.id | 0); if (o && o !== c && o.joined && !o.inMatch && o.party !== c.id) send(o, { t: 'inv', from: c.id, name: c.name }); return; }
   if (m.t === 'invok') {
     const o = clients.get(m.id | 0); if (!o || o === c || !o.joined) return;
