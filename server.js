@@ -5,7 +5,7 @@ const S = require('./public/shared.js');
 const G = S.G, H = S.H, SHIPY = S.SHIPY;
 const PUB = path.join(__dirname, 'public');
 const PORT = process.env.PORT || 3000;
-const TOTAL = +process.env.TOTAL || 600, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
+const TOTAL = +process.env.TOTAL || 500, LOBBY = +process.env.LOBBY || 15, SPEED = +process.env.SPEED || 1, GOD = !!process.env.GOD; // SPEED/GOD nur für Tests
 const REVIVE = 5, BLEED = 1.6, NEAR = 140, GC = 40, LIM = S.R * 0.86, REBOOT = 5;
 const OT = ['tree', 'rock', 'crate', 'barrel', 'prop'], MT = ['wood', 'stone', 'metal'], PTY = ['w', 'f', 'r', 'c'];
 
@@ -15,6 +15,7 @@ const gzCache = new Map();
 const server = http.createServer((req, res) => {
   let u;
   try { u = decodeURIComponent(req.url.split('?')[0]); } catch (e) { res.writeHead(400); res.end(); return; }
+  if (u === '/status-handy' && !CHILD) { require('http').get({ host: '127.0.0.1', port: MPORT, path: '/status' }, (r) => { res.writeHead(r.statusCode, r.headers); r.pipe(res); }).on('error', () => { res.writeHead(503); res.end('Handy-Runde startet noch'); }); return; }
   if (u === '/status') { // wer ist online (nur Namen, keine Daten)
     const hs = [...clients.values()].filter((c) => c.joined);
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -42,7 +43,21 @@ const server = http.createServer((req, res) => {
     });
   });
 });
-const wss = new WebSocketServer({ server, maxPayload: 64 * 1024, perMessageDeflate: { threshold: 16384, zlibDeflateOptions: { level: 3 } } });
+// Handy/iPad bekommen eine eigene Runde mit 100 Spielern: zweiter Spielprozess, WebSocket wird durchgereicht
+const CHILD = !!process.env.CHILD, MPORT = +PORT + 7;
+if (!CHILD && !process.env.NOMOBILE) {
+  const start = () => { const ch = require('child_process').fork(__filename, [], { env: { ...process.env, CHILD: '1', PORT: String(MPORT), TOTAL: '100' } }); ch.on('exit', () => setTimeout(start, 2000)); };
+  start();
+  server.on('upgrade', (req, sock, head) => {
+    if (!/[?&]room=m\b/.test(req.url)) { wss.handleUpgrade(req, sock, head, (ws) => wss.emit('connection', ws, req)); return; }
+    const up = require('net').connect(MPORT, '127.0.0.1', () => {
+      let h = req.method + ' ' + req.url + ' HTTP/1.1\r\n'; for (let i = 0; i < req.rawHeaders.length; i += 2) h += req.rawHeaders[i] + ': ' + req.rawHeaders[i + 1] + '\r\n';
+      up.write(h + '\r\n'); if (head && head.length) up.write(head); up.pipe(sock); sock.pipe(up);
+    });
+    up.on('error', () => sock.destroy()); sock.on('error', () => up.destroy());
+  });
+}
+const wss = new WebSocketServer({ ...(CHILD || process.env.NOMOBILE ? { server } : { noServer: true }), maxPayload: 64 * 1024, perMessageDeflate: { threshold: 16384, zlibDeflateOptions: { level: 3 } } });
 
 // ---------- Zustand
 let nextId = 1, lootId = 1, tickN = 0;
@@ -1087,4 +1102,4 @@ wss.on('connection', (ws) => {
   });
   ws.on('error', () => {});
 });
-server.listen(PORT, () => console.log('Sturmfall läuft auf Port ' + PORT));
+server.listen(PORT, CHILD ? '127.0.0.1' : undefined, () => console.log((CHILD ? 'Handy-Runde (100)' : 'Sturmfall (' + TOTAL + ')') + ' läuft auf Port ' + PORT));

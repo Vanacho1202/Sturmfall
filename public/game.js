@@ -864,7 +864,7 @@ function setRoster(r) {
 }
 function dropEnts() { for (const e of ents.values()) { scene.remove(e.ch.g); disposeChar(e.ch); } ents.clear(); if (me.ch) { scene.remove(me.ch.g); disposeChar(me.ch); me.ch = null; } }
 function connect(name) {
-  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host);
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (TOUCH ? '/?room=m' : '/'));
   ws.onopen = () => tx({ t: 'join', name, hue: HUES[PV.hi], style: PV.st | (PV.skin << 2), mode: prefMode });
   ws.onclose = () => { banner('Verbindung getrennt – Seite neu laden', 999); };
   ws.onmessage = (ev) => onMsg(JSON.parse(ev.data));
