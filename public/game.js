@@ -863,7 +863,9 @@ function setRoster(r) {
   for (const e of ents.values()) e.mate = e.id === mateId;
 }
 function dropEnts() { for (const e of ents.values()) { scene.remove(e.ch.g); disposeChar(e.ch); } ents.clear(); if (me.ch) { scene.remove(me.ch.g); disposeChar(me.ch); me.ch = null; } }
-let roomM = TOUCH, roomPk = null, myName = '';
+// Handy/iPad-Runde: auch iPads mit Tastatur/Trackpad (melden sich als Mac) und alle Handys erkennen
+const MOBILE = TOUCH || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+let roomM = MOBILE, roomPk = null, myName = '';
 function connect(name) {
   myName = name;
   ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + (roomM ? '/?room=m' : '/'));
