@@ -1716,10 +1716,10 @@ function pollPad(dt) {
 }
 // Zielhilfe für Touch (Handy/iPad) und Controller: zieht beim Zielen/Schießen sanft zum nächsten Gegner nahe am Fadenkreuz
 function aimAssist(dt) {
-  if (!(TOUCH || pad.on) || CFG.aimAssist === false || !me.alive || myCar || me.build || !(me.ads || mouseL)) return;
+  const AA = (+CFG.aimAssist || 0) / 50; if (!(MOBILE || pad.on) || AA <= 0 || !me.alive || myCar || me.build || !(me.ads || mouseL)) return;
   const it = me.inv[me.slot - 1]; if (!it || it.k !== 'w') return;
   const ex = me.x, ey = me.y + 1.6, ez = me.z, fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw);
-  let best = null, ba = me.ads ? 0.16 : 0.1;
+  let best = null, ba = (me.ads ? 0.1 : 0.06) + 0.08 * AA;
   for (const e of ents.values()) {
     if (!e.alive || e.mate || (e.fl & 1) || T - e.lastSeen > 0.5) continue;
     const dx = e.x - ex, dz = e.z - ez, dy = e.y + 1.2 - ey, dh = Math.hypot(dx, dz); if (dh > 120 || dh < 1) continue;
@@ -1728,7 +1728,7 @@ function aimAssist(dt) {
     const ang = Math.hypot(dyaw, pitT - me.pitch); if (ang < ba) { ba = ang; best = [dyaw, pitT - me.pitch]; }
   }
   if (!best) return;
-  const k = Math.min(1, dt * (me.ads ? 7 : 4));
+  const k = Math.min(0.5 * AA + 0.05, dt * (me.ads ? 12 : 6) * AA); // max. 50 % Zug pro Sekunde-Schritt
   me.yaw += best[0] * k; me.pitch += best[1] * k;
 }
 function updateMe(dt, now) {

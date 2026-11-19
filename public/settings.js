@@ -2,7 +2,7 @@
 const TOUCH0 = matchMedia('(pointer: coarse)').matches || /[?&]touch=1/.test(location.search);
 const DEF = {
   v: 3, fullscreen: true, auto: TOUCH0, sens: 1, ads: 0.6, scope: 0.22, invY: false, fov: 72, shake: true, bob: true, dmgNum: true, crouchToggle: true, autoSprint: false,
-  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, pad: {}, kit: false, aimAssist: true, padSens: 1, hudScale: 1, hudAlpha: 0.85, shad: true,
+  vol: { m: 0.8, s: 1, a: 0.6, u: 0.8 }, binds: { ControlLeft: 'ShiftLeft', ShiftLeft: 'ControlLeft', KeyX: 'KeyG', KeyG: 'KeyX' }, hud: {}, pad: {}, kit: false, aimAssist: 30, padSens: 1, hudScale: 1, hudAlpha: 0.85, shad: true,
 };
 export const ACTIONS = [
   ['KeyW', 'Vorwärts'], ['KeyS', 'Rückwärts'], ['KeyA', 'Links'], ['KeyD', 'Rechts'], ['Space', 'Springen / Gleiter'], ['ControlLeft', 'Ducken / Rutschen'], ['ShiftLeft', 'Sprinten (halten)'],
@@ -21,6 +21,7 @@ export const padBtn = (a) => { const v = CFG.pad[a]; return v != null ? v : PAD_
 export const CFG = JSON.parse(JSON.stringify(DEF));
 try { const s = JSON.parse(localStorage.getItem('sf_cfg') || '{}'); for (const k in s) if (k in DEF) CFG[k] = typeof DEF[k] === 'object' && !Array.isArray(DEF[k]) ? { ...DEF[k], ...s[k] } : s[k]; } catch (e) {}
 // Version 3: G = fallen lassen, X = Wand bearbeiten (wenn nicht selbst belegt)
+if (typeof CFG.aimAssist !== 'number') CFG.aimAssist = CFG.aimAssist === false ? 0 : 30;
 if (CFG.v === 2) { CFG.v = 3; if (!CFG.binds.KeyX && !CFG.binds.KeyG) { CFG.binds.KeyX = 'KeyG'; CFG.binds.KeyG = 'KeyX'; } }
 // Umstellung auf Version 2: Shift = Ducken, Strg = Sprinten, kein Auto-Sprint am PC
 if (!(CFG.v >= 2)) { CFG.v = 3; if (!Object.keys(CFG.binds).length) CFG.binds = { ...DEF.binds }; CFG.autoSprint = false; if (CFG.fullscreen == null) CFG.fullscreen = true; }
@@ -81,7 +82,7 @@ const rg = (k, min, max, step, fmt, sub) => `<input type="range" data-rg="${k}" 
 
 const TABS = {
   spiel: () =>
-    row('Zielhilfe', 'Am Handy/iPad und mit Controller: Zielen zieht leicht zum Gegner', tg('aimAssist')) +
+    row('Zielhilfe', 'Handy/iPad und Controller: zieht beim Zielen zum Gegner. 0 = aus, bis 50 %', rg('aimAssist', 0, 50, 10, '%')) +
     row('Test-Ausrüstung', 'Jede Runde mit legendärem Sturmgewehr, Jagdgewehr, Sniper, 2 Medkits und voller Munition', tg('kit')) +
     row('Auto-Feuer', 'Schießt automatisch, wenn das Fadenkreuz auf einem Gegner liegt', tg('auto')) +
     row('Auto-Sprint', 'An: immer rennen, Sprint-Taste = gehen. Aus: Sprint-Taste halten', tg('autoSprint')) +
